@@ -338,7 +338,7 @@ if submitted:
             df = pd.DataFrame(rows)
             styled = (
                 df.style
-                .applymap(_estilo_pnl, subset=["P&L", "ROI"])
+                .map(_estilo_pnl, subset=["P&L", "ROI"])
                 .set_properties(**{"font-size": "0.84rem"})
             )
             st.dataframe(styled, use_container_width=True, hide_index=True)
@@ -375,7 +375,7 @@ if submitted:
                 return ""
 
             df_risco = pd.DataFrame(rows_risco)
-            styled_r = df_risco.style.applymap(_cor_nivel, subset=["Nível"])
+            styled_r = df_risco.style.map(_cor_nivel, subset=["Nível"])
             st.dataframe(styled_r, use_container_width=True, hide_index=True)
 
         st.markdown("""

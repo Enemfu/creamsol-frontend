@@ -304,7 +304,7 @@ if submitted:
             df = pd.DataFrame(rows)
             styled = (
                 df.style
-                .applymap(_estilo_pnl, subset=["P&L Não Real.", "ROI"])
+                .map(_estilo_pnl, subset=["P&L Não Real.", "ROI"])
                 .set_properties(**{"font-size": "0.84rem"})
             )
             st.dataframe(styled, use_container_width=True, hide_index=True)
