@@ -3,8 +3,12 @@
 # ====
 
 import streamlit as st
+import requests
+import pandas as pd
+import re
+from config import API_BASE_URL
 
-# ── DEVE ser a primeira chamada Streamlit ────
+# ── set_page_config DEVE ser o primeiro comando Streamlit ────
 st.set_page_config(
     page_title="Iniciante · CreamSol.io",
     page_icon="🟢",
@@ -12,14 +16,88 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-import requests
-import pandas as pd
-import re
-from config import API_BASE_URL
-from components.estilo import aplicar_css, rodape
-
-# ── CSS Global (imediatamente após set_page_config) ────
+from components.estilo import aplicar_css
 aplicar_css()
+
+# ── CSS local (complementar ao estilo global) ────
+st.markdown("""
+<style>
+.stApp { background-color: #F5F5F5; }
+.block-container { padding-top: 1.8rem; padding-bottom: 2rem; max-width: 1100px; }
+
+.cs-logo { font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; color: #1A1A1A; }
+.cs-logo span { color: #C62828; }
+
+.cs-badge {
+    display: inline-block;
+    font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    background: #E8F5E9; color: #2E7D32;
+    border-radius: 4px; padding: 2px 10px;
+    margin-left: 0.6rem; vertical-align: middle;
+}
+
+/* Cartão métrica */
+.cs-metric {
+    background: #FFFFFF;
+    border: 1px solid #E0E0E0;
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    text-align: left;
+}
+.cs-metric-label {
+    font-size: 0.72rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: #9E9E9E; margin-bottom: 0.3rem;
+}
+.cs-metric-valor {
+    font-size: 1.5rem; font-weight: 800; color: #1A1A1A; line-height: 1.1;
+}
+.cs-metric-valor.pos { color: #2E7D32; }
+.cs-metric-valor.neg { color: #C62828; }
+.cs-metric-valor.nd  { color: #BDBDBD; font-size: 1.1rem; font-weight: 500; }
+
+/* Secção */
+.cs-section-title {
+    font-size: 0.78rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: #9E9E9E; margin: 1.4rem 0 0.6rem 0;
+}
+
+/* Composição */
+.cs-comp-card {
+    background: #FFFFFF; border: 1px solid #E0E0E0;
+    border-radius: 10px; padding: 0.9rem 1.2rem;
+    display: flex; flex-direction: column; gap: 0.2rem;
+}
+.cs-comp-label { font-size: 0.72rem; color: #9E9E9E; text-transform: uppercase; letter-spacing: 0.06em; }
+.cs-comp-valor { font-size: 1.15rem; font-weight: 700; color: #1A1A1A; }
+.cs-comp-pct   { font-size: 0.82rem; color: #757575; }
+
+/* Dust */
+.cs-dust-item {
+    display: inline-block;
+    background: #FAFAFA; border: 1px solid #E0E0E0;
+    border-radius: 6px; padding: 3px 10px;
+    font-size: 0.78rem; color: #757575; margin: 2px 3px;
+}
+
+/* Aviso */
+.cs-aviso {
+    background: #FAFAFA; border-left: 3px solid #BDBDBD;
+    padding: 0.6rem 1rem; color: #9E9E9E;
+    font-size: 0.76rem; border-radius: 0 6px 6px 0; margin-top: 1.5rem;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: #FFFFFF; border-right: 1px solid #E0E0E0;
+}
+
+/* Tabela */
+thead tr th { background: #F5F5F5 !important; color: #424242 !important; font-size: 0.8rem; }
+</style>
+""", unsafe_allow_html=True)
 
 # ── Regex validação Solana ────
 SOLANA_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
@@ -48,6 +126,7 @@ st.markdown("---")
 # ── Formulário ────
 tab_simples, tab_multi = st.tabs(["📌 Carteira única", "📂 Múltiplas carteiras (até 5)"])
 
+# ── Tab: carteira única ────
 with tab_simples:
     with st.form("form_single"):
         col_w, col_m, col_btn = st.columns([4, 1, 1])
@@ -62,6 +141,7 @@ with tab_simples:
         with col_btn:
             submitted_single = st.form_submit_button("🔍 Analisar", use_container_width=True)
 
+# ── Tab: múltiplas carteiras ────
 with tab_multi:
     with st.form("form_multi"):
         carteiras_raw = st.text_area(
@@ -78,6 +158,7 @@ with tab_multi:
 
 # ── Funções auxiliares ────
 def _cor_classe(valor_str: str) -> str:
+    """Devolve 'pos', 'neg' ou 'nd' com base no valor formatado."""
     if not valor_str or valor_str.strip() in ("N/D", "", "—"):
         return "nd"
     try:
@@ -104,14 +185,27 @@ def _metrica(label: str, valor: str):
 def _renderizar_dashboard(d: dict):
     """Renderiza o dashboard a partir do JSON da API."""
 
-    # ── Visão Geral ────
+    # ── Métricas topo ────
     st.markdown('<div class="cs-section-title">Visão Geral</div>', unsafe_allow_html=True)
     c1, c2, c3, c4, c5 = st.columns(5, gap="small")
-    with c1: _metrica("Patrimônio Total", d["patrimonio_total"])
-    with c2: _metrica("P&L Total", d["pnl_total"])
-    with c3: _metrica("ROI Total", d["roi_total"])
-    with c4: _metrica("Tokens", str(d["n_tokens"]))
-    with c5: _metrica("NFTs", str(d["n_nfts"]))
+    with c1: _metrica("Patrimônio Total",  d["patrimonio_total"])
+    with c2: _metrica("P&L Total",         d["pnl_total"])
+    with c3: _metrica("ROI Total",         d["roi_total"])
+    with c4: _metrica("Tokens",            str(d["n_tokens"]))
+    with c5: _metrica("NFTs",              str(d["n_nfts"]))
+
+    # ── Actividade 90 dias ────
+    st.markdown('<div class="cs-section-title">Actividade (90 dias)</div>', unsafe_allow_html=True)
+    a1, a2, a3, a4 = st.columns(4, gap="small")
+    with a1:
+        taxa_sol = d.get("total_taxas_sol", 0.0)
+        _metrica("Taxas (SOL)", f"{taxa_sol:.6f} SOL" if isinstance(taxa_sol, float) else str(taxa_sol))
+    with a2:
+        _metrica("Taxas (USD)",      d.get("total_taxas_usd",       "N/D"))
+    with a3:
+        _metrica("Slippage Est.",    d.get("total_slippage_usd",    "N/D"))
+    with a4:
+        _metrica("Vol. Movimentado", d.get("total_movimentado_usd", "N/D"))
 
     # ── Composição ────
     st.markdown('<div class="cs-section-title">Composição</div>', unsafe_allow_html=True)
@@ -131,26 +225,6 @@ def _renderizar_dashboard(d: dict):
             <div class="cs-comp-valor">{comp['criptomoedas']}</div>
             <div class="cs-comp-pct">{comp['criptomoedas_pct']} do portfólio</div>
         </div>""", unsafe_allow_html=True)
-
-    # ── Actividade (últimos 90 dias) ────
-    st.markdown('<div class="cs-section-title">Actividade (últimos 90 dias)</div>', unsafe_allow_html=True)
-    a1, a2, a3, a4 = st.columns(4, gap="small")
-    with a1:
-        _metrica("Taxas On-Chain (SOL)", f"{d.get('total_taxas_sol', 0):.6f} SOL")
-    with a2:
-        _metrica("Taxas On-Chain (USD)", d.get("total_taxas_usd", "N/D"))
-    with a3:
-        slip = d.get("total_slippage_usd", "N/D")
-        st.markdown(f"""
-        <div class="cs-metric">
-            <div class="cs-metric-label">Slippage Estimado</div>
-            <div class="cs-metric-valor nd">{slip}</div>
-        </div>
-        <div style="font-size:0.7rem;color:#BDBDBD;margin-top:0.2rem;padding-left:0.2rem">
-            ⓘ Estimativa baseada em swaps on-chain identificados
-        </div>""", unsafe_allow_html=True)
-    with a4:
-        _metrica("Volume Movimentado", d.get("total_movimentado_usd", "N/D"))
 
     # ── Tokens ────
     st.markdown('<div class="cs-section-title">Tokens</div>', unsafe_allow_html=True)
@@ -206,7 +280,7 @@ def _renderizar_dashboard(d: dict):
         )
         st.markdown(dust_html, unsafe_allow_html=True)
 
-    # ── Rodapé / Aviso ────
+    # ── Aviso legal ────
     st.markdown(f"""
     <div class="cs-aviso">
         🔒 {d.get("aviso_legal", "Dados apenas informativos. Nenhum dado é armazenado.")}
@@ -222,11 +296,12 @@ if submitted_single:
     else:
         with st.spinner("A consultar a blockchain..."):
             try:
-                url = f"{API_BASE_URL}/v1/iniciante/{carteira.strip()}?moeda={moeda}"
+                url  = f"{API_BASE_URL}/v1/iniciante/{carteira.strip()}?moeda={moeda}"
                 resp = requests.get(url, timeout=40)
                 resp.raise_for_status()
                 _renderizar_dashboard(resp.json())
             except requests.exceptions.HTTPError as e:
+                detalhe = ""
                 try:
                     detalhe = e.response.json().get("detail", e.response.text)
                 except Exception:
@@ -239,7 +314,7 @@ if submitted_single:
 
 # ── Lógica: múltiplas carteiras ────
 if submitted_multi:
-    linhas = [l.strip() for l in carteiras_raw.strip().splitlines() if l.strip()]
+    linhas    = [l.strip() for l in carteiras_raw.strip().splitlines() if l.strip()]
     invalidas = [l for l in linhas if not SOLANA_RE.match(l)]
     if not linhas:
         st.warning("Introduza pelo menos um endereço.")
@@ -251,12 +326,13 @@ if submitted_multi:
         with st.spinner(f"A consolidar {len(linhas)} carteira(s)..."):
             try:
                 payload = {"carteiras": linhas, "moeda": moeda_multi}
-                url = f"{API_BASE_URL}/v1/iniciante/multi"
-                resp = requests.post(url, json=payload, timeout=60)
+                url     = f"{API_BASE_URL}/v1/iniciante/multi"
+                resp    = requests.post(url, json=payload, timeout=60)
                 resp.raise_for_status()
                 st.success(f"Consolidado de {len(linhas)} carteira(s)")
                 _renderizar_dashboard(resp.json())
             except requests.exceptions.HTTPError as e:
+                detalhe = ""
                 try:
                     detalhe = e.response.json().get("detail", e.response.text)
                 except Exception:
