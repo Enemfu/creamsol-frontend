@@ -250,7 +250,7 @@ def _renderizar_dashboard(d: dict):
 
         styled = (
             df.style
-            .applymap(_estilo_col, subset=["P&L", "ROI"])
+            .map(_estilo_col, subset=["P&L", "ROI"])
             .set_properties(**{"font-size": "0.85rem"})
         )
         st.dataframe(styled, use_container_width=True, hide_index=True)
