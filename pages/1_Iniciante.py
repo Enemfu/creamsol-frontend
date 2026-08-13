@@ -15,7 +15,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Global CSS ────
 st.markdown("""
 <style>
 .stApp { background-color: #F5F5F5; }
@@ -25,8 +24,7 @@ st.markdown("""
 .cs-logo span { color: #2E7D32; }
 
 .cs-badge {
-    display: inline-block;
-    font-size: 0.7rem; font-weight: 700;
+    display: inline-block; font-size: 0.7rem; font-weight: 700;
     letter-spacing: 0.08em; text-transform: uppercase;
     background: #E8F5E9; color: #2E7D32;
     border-radius: 4px; padding: 2px 10px;
@@ -53,32 +51,33 @@ st.markdown("""
     color: #9E9E9E; margin: 1.4rem 0 0.6rem 0;
 }
 
-.cs-comp-bar {
-    display: flex; align-items: center; gap: 0.6rem;
-    margin-bottom: 0.45rem;
+/* Composition — side by side */
+.cs-comp-row {
+    display: flex; gap: 1rem; margin-top: 0.4rem;
 }
-.cs-comp-label {
-    font-size: 0.82rem; font-weight: 600;
-    color: #1A1A1A; min-width: 100px;
+.cs-comp-card {
+    flex: 1; background: #FFFFFF; border: 1px solid #E0E0E0;
+    border-radius: 10px; padding: 0.9rem 1.1rem;
 }
+.cs-comp-card-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: #9E9E9E; margin-bottom: 0.5rem;
+}
+.cs-comp-card-pct {
+    font-size: 1.3rem; font-weight: 800; margin-bottom: 0.4rem;
+}
+.cs-comp-card-val { font-size: 0.82rem; color: #757575; }
 .cs-comp-track {
-    flex: 1; height: 7px; background: #EEEEEE;
-    border-radius: 4px; overflow: hidden;
+    height: 6px; background: #EEEEEE;
+    border-radius: 4px; overflow: hidden; margin-top: 0.6rem;
 }
-.cs-comp-fill {
-    height: 100%; border-radius: 4px;
-    background: linear-gradient(90deg, #2E7D32, #66BB6A);
-}
-.cs-comp-pct {
-    font-size: 0.78rem; color: #757575;
-    min-width: 38px; text-align: right;
-}
+.cs-comp-fill-stable { height: 100%; border-radius: 4px; background: #1565C0; }
+.cs-comp-fill-crypto  { height: 100%; border-radius: 4px; background: #2E7D32; }
 
 .cs-aviso {
     background: #FAFAFA; border-left: 3px solid #BDBDBD;
     padding: 0.6rem 1rem; color: #9E9E9E;
-    font-size: 0.76rem; border-radius: 0 6px 6px 0;
-    margin-top: 1.5rem;
+    font-size: 0.76rem; border-radius: 0 6px 6px 0; margin-top: 1.5rem;
 }
 
 section[data-testid="stSidebar"] {
@@ -87,7 +86,6 @@ section[data-testid="stSidebar"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ── Constants ────
 SOLANA_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 
 # ── Sidebar ────
@@ -127,8 +125,8 @@ def _cor(valor_str: str) -> str:
         return "nd"
 
 
-def _metrica(label: str, valor: str):
-    cor = _cor(valor)
+def _metrica(label: str, valor: str, forcar_neg: bool = False):
+    cor = "neg" if forcar_neg else _cor(valor)
     st.markdown(f"""
     <div class="cs-metric">
         <div class="cs-metric-label">{label}</div>
@@ -136,20 +134,11 @@ def _metrica(label: str, valor: str):
     </div>""", unsafe_allow_html=True)
 
 
-def _barra(label: str, valor: str, pct: str):
+def _pct_float(pct_str: str) -> float:
     try:
-        pct_val = float(str(pct).replace("%","").replace(",",".").strip())
+        return float(str(pct_str).replace("%","").replace("+","").replace(",",".").strip())
     except Exception:
-        pct_val = 0.0
-    bar_w = min(max(pct_val, 0), 100)
-    st.markdown(f"""
-    <div class="cs-comp-bar">
-        <div class="cs-comp-label">{label}</div>
-        <div class="cs-comp-track">
-            <div class="cs-comp-fill" style="width:{bar_w}%"></div>
-        </div>
-        <div class="cs-comp-pct">{pct}</div>
-    </div>""", unsafe_allow_html=True)
+        return 0.0
 
 
 def _chamar_api(carteira: str, moeda: str) -> dict | None:
@@ -159,7 +148,6 @@ def _chamar_api(carteira: str, moeda: str) -> dict | None:
         resp.raise_for_status()
         return resp.json()
     except requests.exceptions.HTTPError as e:
-        detalhe = ""
         try:
             detalhe = e.response.json().get("detail", e.response.text)
         except Exception:
@@ -177,35 +165,67 @@ def _renderizar_dashboard(d: dict, carteira: str):
     # ── Portfolio Overview ────
     st.markdown('<div class="cs-section-title">Portfolio Overview</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4, gap="small")
-    with c1: _metrica("Total Portfolio",  d.get("patrimonio_total", "N/A"))
-    with c2: _metrica("SOL Balance",      d.get("saldo_sol_usd", "N/A"))
-    with c3: _metrica("Total P&L",        d.get("pnl_total", "N/A"))
-    with c4: _metrica("Fees Paid",        d.get("total_taxas_usd", "N/A"))
 
-    # ── 30-day comparison ────
+    # Extrai SOL balance da lista de tokens
+    sol_amount = "—"
+    sol_valor  = "—"
+    for t in d.get("tokens", []):
+        if str(t.get("simbolo","")).upper() in ("SOL", "WSOL"):
+            sol_amount = f"{t.get('quantidade', 0):.6f}" if isinstance(t.get('quantidade'), (int, float)) else str(t.get('quantidade','—'))
+            sol_valor  = t.get("valor", "—")
+            break
+
+    with c1: _metrica("Total Portfolio", d.get("patrimonio_total", "N/A"))
+    with c2: _metrica("SOL Balance",     sol_valor)
+    with c3: _metrica("Total P&L",       d.get("pnl_total", "N/A"))
+    with c4: _metrica("Fees Paid",       d.get("total_taxas_usd", "N/A"), forcar_neg=True)
+
+    # ── 30-Day Comparison ────
     st.markdown('<div class="cs-section-title">30-Day Comparison</div>', unsafe_allow_html=True)
     m1, m2, m3 = st.columns(3, gap="small")
     with m1: _metrica("Portfolio (30d ago)", d.get("patrimonio_30d", "N/D"))
     with m2: _metrica("Change (30d)",        d.get("delta_valor", "—"))
-    with m3: _metrica("Tokens (30d ago)",    d.get("n_tokens_30d", "—"))
+    with m3: _metrica("Tokens (30d ago)",    str(d.get("n_tokens_30d", "—")))
 
     # ── Details ────
     st.markdown('<div class="cs-section-title">Details</div>', unsafe_allow_html=True)
     d1, d2, d3, d4 = st.columns(4, gap="small")
-    with d1: _metrica("SOL (amount)",    f"{d.get('total_taxas_sol', 0):.6f}")
-    with d2: _metrica("Fees (SOL)",      f"{d.get('total_taxas_sol', 0):.6f}")
-    with d3: _metrica("Est. Slippage",   d.get("total_slippage_usd", "—"))
-    with d4: _metrica("Tokens",          str(d.get("n_tokens", "N/A")))
+    with d1: _metrica("SOL (amount)",  sol_amount)
+    with d2: _metrica("Fees (SOL)",    f"{d.get('total_taxas_sol', 0):.6f}", forcar_neg=True)
+    with d3: _metrica("Est. Slippage", d.get("total_slippage_usd", "—"),    forcar_neg=True)
+    with d4: _metrica("Tokens",        str(d.get("n_tokens", "N/A")))
 
-    # ── Composition ────
+    # ── Composition — side by side, cores diferentes ────
     comp = d.get("composicao", {})
     if comp:
         st.markdown('<div class="cs-section-title">Composition</div>', unsafe_allow_html=True)
-        # A API devolve um objecto com 4 campos: stablecoins, stablecoins_pct, criptomoedas, criptomoedas_pct
-        _barra("Stablecoins",   comp.get("stablecoins", "—"),   comp.get("stablecoins_pct", "0%"))
-        _barra("Crypto",        comp.get("criptomoedas", "—"),  comp.get("criptomoedas_pct", "0%"))
+        pct_st = _pct_float(comp.get("stablecoins_pct", "0"))
+        pct_cr = _pct_float(comp.get("criptomoedas_pct", "0"))
+        bar_st = min(max(pct_st, 0), 100)
+        bar_cr = min(max(pct_cr, 0), 100)
 
-    # ── Tokens table ────
+        st.markdown(f"""
+        <div class="cs-comp-row">
+            <div class="cs-comp-card">
+                <div class="cs-comp-card-label">Stablecoins</div>
+                <div class="cs-comp-card-pct" style="color:#1565C0">{comp.get("stablecoins_pct","—")}</div>
+                <div class="cs-comp-card-val">{comp.get("stablecoins","—")}</div>
+                <div class="cs-comp-track">
+                    <div class="cs-comp-fill-stable" style="width:{bar_st}%"></div>
+                </div>
+            </div>
+            <div class="cs-comp-card">
+                <div class="cs-comp-card-label">Crypto</div>
+                <div class="cs-comp-card-pct" style="color:#2E7D32">{comp.get("criptomoedas_pct","—")}</div>
+                <div class="cs-comp-card-val">{comp.get("criptomoedas","—")}</div>
+                <div class="cs-comp-track">
+                    <div class="cs-comp-fill-crypto" style="width:{bar_cr}%"></div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── Tokens table — Top 3 visível, restante locked ────
     st.markdown('<div class="cs-section-title">Tokens</div>', unsafe_allow_html=True)
     tokens = d.get("tokens", [])
     if tokens:
@@ -237,13 +257,28 @@ def _renderizar_dashboard(d: dict, carteira: str):
                 pass
             return ""
 
-        styled = (
-            df.style
+        # Top 3 sempre visível
+        styled_top = (
+            df.head(3).style
             .map(_estilo_col, subset=["P&L", "ROI"])
             .set_properties(**{"font-size": "0.85rem"})
         )
-        st.dataframe(styled, use_container_width=True, hide_index=True)
+        st.dataframe(styled_top, use_container_width=True, hide_index=True)
 
+        # Restante — locked, sem dados
+        if len(df) > 3:
+            with st.expander(f"🔒 {len(df) - 3} more tokens — Intermediate plan"):
+                st.markdown("""
+                <div style="text-align:center; padding:1.5rem 0;">
+                    <div style="font-size:1.5rem; margin-bottom:0.5rem">🔒</div>
+                    <div style="font-weight:700; color:#1A1A1A; margin-bottom:0.4rem">
+                        Intermediate Plan required
+                    </div>
+                    <div style="font-size:0.85rem; color:#757575;">
+                        Upgrade to view your full token list, detailed P&L,
+                        ROI per token and CSV export.
+                    </div>
+                </div>""", unsafe_allow_html=True)
     else:
         st.info("No significant tokens found in this wallet.")
 
@@ -277,7 +312,6 @@ with st.form("form_carteira"):
     with col_btn:
         submitted = st.form_submit_button("🔍 Analyse", use_container_width=True)
 
-# ── Submit logic ────
 if submitted:
     if not carteira or not carteira.strip():
         st.warning("Please enter a Solana wallet address.")
