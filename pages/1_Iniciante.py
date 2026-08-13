@@ -260,7 +260,7 @@ def _renderizar_dashboard(d: dict):
     # ── Legal notice ────
     st.markdown(f"""
     <div class="cs-aviso">
-        🔒 <strong>Privacy:</strong> {d.get("aviso_legal", "For informational purposes only. No data is stored or shared.")}
+        🔒 <strong>Privacy:</strong> For informational purposes only. No wallet address or personal data is stored, logged or shared. CreamSol.io does not constitute financial or tax advice.
     </div>""", unsafe_allow_html=True)
 
 
