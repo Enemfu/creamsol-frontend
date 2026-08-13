@@ -84,7 +84,7 @@ with col1:
             <li>Composição (Stable / Cripto)</li>
             <li>Taxas on-chain pagas</li>
             <li>Tokens dust identificados</li>
-            <li>Múltiplas carteiras (até 5)</li>
+            .<li>Múltiplas carteiras (até 3)</li>
             <li class="nd">Export CSV/JSON</li>
         </ul>
     </div>""", unsafe_allow_html=True)
