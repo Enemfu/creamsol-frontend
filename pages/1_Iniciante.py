@@ -44,6 +44,9 @@ st.markdown("""
 .cs-metric-valor.pos { color: #2E7D32; }
 .cs-metric-valor.neg { color: #C62828; }
 .cs-metric-valor.nd  { color: #BDBDBD; font-size: 1.05rem; font-weight: 500; }
+.cs-metric-sub {
+    font-size: 0.78rem; color: #9E9E9E; margin-top: 0.25rem; font-weight: 500;
+}
 
 .cs-section-title {
     font-size: 0.78rem; font-weight: 700;
@@ -51,10 +54,8 @@ st.markdown("""
     color: #9E9E9E; margin: 1.4rem 0 0.6rem 0;
 }
 
-/* Composition — side by side */
-.cs-comp-row {
-    display: flex; gap: 1rem; margin-top: 0.4rem;
-}
+/* Composition cards */
+.cs-comp-row { display: flex; gap: 1rem; margin-top: 0.4rem; }
 .cs-comp-card {
     flex: 1; background: #FFFFFF; border: 1px solid #E0E0E0;
     border-radius: 10px; padding: 0.9rem 1.1rem;
@@ -63,9 +64,7 @@ st.markdown("""
     font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.06em; color: #9E9E9E; margin-bottom: 0.5rem;
 }
-.cs-comp-card-pct {
-    font-size: 1.3rem; font-weight: 800; margin-bottom: 0.4rem;
-}
+.cs-comp-card-pct { font-size: 1.3rem; font-weight: 800; margin-bottom: 0.4rem; }
 .cs-comp-card-val { font-size: 0.82rem; color: #757575; }
 .cs-comp-track {
     height: 6px; background: #EEEEEE;
@@ -111,34 +110,66 @@ st.markdown("---")
 
 
 # ── Helpers ────
-def _cor(valor_str: str) -> str:
-    if not valor_str or str(valor_str).strip() in ("N/A", "N/D", "", "—"):
-        return "nd"
+def _parse_float(val_str: str) -> float | None:
+    """Extrai float de uma string formatada como '$1,234.56' ou '12.3%'."""
     try:
-        v = float(
-            str(valor_str)
+        return float(
+            str(val_str)
             .replace("$","").replace("€","").replace("£","")
-            .replace("%","").replace(",","").replace("<","").replace("+","").strip()
+            .replace("%","").replace(",","").replace("+","").replace("<","").strip()
         )
-        return "pos" if v > 0 else ("neg" if v < 0 else "")
     except Exception:
+        return None
+
+
+def _fmt2(val_str: str, prefix: str = "", suffix: str = "") -> str:
+    """Reformata qualquer valor numérico para 2 casas decimais, preservando prefixo/sufixo."""
+    if str(val_str).strip() in ("N/A", "N/D", "—", "", "?"):
+        return str(val_str)
+    # detecta prefixo monetário
+    s = str(val_str).strip()
+    detected_prefix = ""
+    for sym in ("$", "€", "£"):
+        if s.startswith(sym) or s.startswith("-" + sym) or s.startswith("+" + sym):
+            detected_prefix = sym
+            break
+    sign = ""
+    if s.startswith("+"):
+        sign = "+"
+    elif s.startswith("-"):
+        sign = "-"
+    v = _parse_float(s)
+    if v is None:
+        return s
+    p = prefix or detected_prefix
+    su = suffix or ("%" if "%" in s else "")
+    formatted = f"{abs(v):,.2f}"
+    return f"{sign}{p}{formatted}{su}"
+
+
+def _cor(valor_str: str) -> str:
+    if str(valor_str).strip() in ("N/A", "N/D", "", "—"):
         return "nd"
+    v = _parse_float(valor_str)
+    if v is None:
+        return "nd"
+    return "pos" if v > 0 else ("neg" if v < 0 else "")
 
 
-def _metrica(label: str, valor: str, forcar_neg: bool = False):
+def _metrica(label: str, valor: str, sub: str = "", forcar_neg: bool = False):
     cor = "neg" if forcar_neg else _cor(valor)
+    sub_html = f'<div class="cs-metric-sub">{sub}</div>' if sub else ""
     st.markdown(f"""
     <div class="cs-metric">
         <div class="cs-metric-label">{label}</div>
-        <div class="cs-metric-valor {cor}">{valor}</div>
+        <div class="cs-metric-valor {cor}">{_fmt2(valor)}</div>
+        {sub_html}
     </div>""", unsafe_allow_html=True)
 
 
 def _pct_float(pct_str: str) -> float:
-    try:
-        return float(str(pct_str).replace("%","").replace("+","").replace(",",".").strip())
-    except Exception:
-        return 0.0
+    v = _parse_float(pct_str)
+    return v if v is not None else 0.0
 
 
 def _chamar_api(carteira: str, moeda: str) -> dict | None:
@@ -162,62 +193,87 @@ def _chamar_api(carteira: str, moeda: str) -> dict | None:
 
 def _renderizar_dashboard(d: dict, carteira: str):
 
-    # ── Portfolio Overview ────
-    st.markdown('<div class="cs-section-title">Portfolio Overview</div>', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4, gap="small")
-
-    # Extrai SOL balance da lista de tokens
+    # ── SOL da lista de tokens ────
     sol_amount = "—"
     sol_valor  = "—"
     for t in d.get("tokens", []):
-        if str(t.get("simbolo","")).upper() in ("SOL", "WSOL"):
-            sol_amount = f"{t.get('quantidade', 0):.6f}" if isinstance(t.get('quantidade'), (int, float)) else str(t.get('quantidade','—'))
+        if str(t.get("simbolo","")).upper().replace("⚠️ ","") in ("SOL", "WSOL"):
+            q = t.get("quantidade", None)
+            sol_amount = f"{float(q):.6f}" if isinstance(q, (int, float)) else str(q or "—")
             sol_valor  = t.get("valor", "—")
             break
 
-    with c1: _metrica("Total Portfolio", d.get("patrimonio_total", "N/A"))
-    with c2: _metrica("SOL Balance",     sol_valor)
-    with c3: _metrica("Total P&L",       d.get("pnl_total", "N/A"))
-    with c4: _metrica("Fees Paid",       d.get("total_taxas_usd", "N/A"), forcar_neg=True)
+    # ── Portfolio Overview ────
+    st.markdown('<div class="cs-section-title">Portfolio Overview</div>', unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4, gap="small")
+    n_tokens_atual = d.get("n_tokens", "—")
+    with c1: _metrica("Total Portfolio",  d.get("patrimonio_total","N/A"),
+                       sub=f"{n_tokens_atual} tokens")
+    with c2: _metrica("SOL Balance",      sol_valor,
+                       sub=f"{sol_amount} SOL")
+    with c3: _metrica("Total P&L",        d.get("pnl_total","N/A"))
+    with c4: _metrica("Fees Paid",        d.get("total_taxas_usd","N/A"), forcar_neg=True)
 
     # ── 30-Day Comparison ────
     st.markdown('<div class="cs-section-title">30-Day Comparison</div>', unsafe_allow_html=True)
+
+    pat_atual  = d.get("patrimonio_total", "—")
+    pat_30d    = d.get("patrimonio_30d",   "N/D")
+    delta_val  = d.get("delta_valor",      "—")
+    n_atual    = d.get("n_tokens",         "—")
+    n_30d      = d.get("n_tokens_30d",     "—")
+    delta_tok  = d.get("delta_tokens",     "—")
+
+    # Delta tokens com sinal
+    try:
+        dt_int = int(str(delta_tok).replace("+","").replace("—","").strip())
+        delta_tok_fmt = f"+{dt_int}" if dt_int > 0 else str(dt_int)
+    except Exception:
+        delta_tok_fmt = str(delta_tok)
+
     m1, m2, m3 = st.columns(3, gap="small")
-    with m1: _metrica("Portfolio (30d ago)", d.get("patrimonio_30d", "N/D"))
-    with m2: _metrica("Change (30d)",        d.get("delta_valor", "—"))
-    with m3: _metrica("Tokens (30d ago)",    str(d.get("n_tokens_30d", "—")))
+    with m1:
+        _metrica("Now",      pat_atual, sub=f"{n_atual} tokens")
+    with m2:
+        _metrica("30d ago",  pat_30d,   sub=f"{n_30d} tokens")
+    with m3:
+        _metrica("Change",   delta_val, sub=f"{delta_tok_fmt} tokens")
 
     # ── Details ────
     st.markdown('<div class="cs-section-title">Details</div>', unsafe_allow_html=True)
     d1, d2, d3, d4 = st.columns(4, gap="small")
     with d1: _metrica("SOL (amount)",  sol_amount)
-    with d2: _metrica("Fees (SOL)",    f"{d.get('total_taxas_sol', 0):.6f}", forcar_neg=True)
-    with d3: _metrica("Est. Slippage", d.get("total_slippage_usd", "—"),    forcar_neg=True)
-    with d4: _metrica("Tokens",        str(d.get("n_tokens", "N/A")))
+    with d2: _metrica("Fees (SOL)",    f"{d.get('total_taxas_sol', 0):.2f}", forcar_neg=True)
+    with d3: _metrica("Est. Slippage", d.get("total_slippage_usd","—"),      forcar_neg=True)
+    with d4: _metrica("Moved (USD)",   d.get("total_movimentado_usd","—"))
 
-    # ── Composition — side by side, cores diferentes ────
+    # ── Composition ────
     comp = d.get("composicao", {})
     if comp:
         st.markdown('<div class="cs-section-title">Composition</div>', unsafe_allow_html=True)
-        pct_st = _pct_float(comp.get("stablecoins_pct", "0"))
-        pct_cr = _pct_float(comp.get("criptomoedas_pct", "0"))
+        pct_st = _pct_float(comp.get("stablecoins_pct","0"))
+        pct_cr = _pct_float(comp.get("criptomoedas_pct","0"))
         bar_st = min(max(pct_st, 0), 100)
         bar_cr = min(max(pct_cr, 0), 100)
+        val_st = _fmt2(comp.get("stablecoins","—"))
+        val_cr = _fmt2(comp.get("criptomoedas","—"))
+        pct_st_fmt = _fmt2(comp.get("stablecoins_pct","—"))
+        pct_cr_fmt = _fmt2(comp.get("criptomoedas_pct","—"))
 
         st.markdown(f"""
         <div class="cs-comp-row">
             <div class="cs-comp-card">
                 <div class="cs-comp-card-label">Stablecoins</div>
-                <div class="cs-comp-card-pct" style="color:#1565C0">{comp.get("stablecoins_pct","—")}</div>
-                <div class="cs-comp-card-val">{comp.get("stablecoins","—")}</div>
+                <div class="cs-comp-card-pct" style="color:#1565C0">{pct_st_fmt}</div>
+                <div class="cs-comp-card-val">{val_st}</div>
                 <div class="cs-comp-track">
                     <div class="cs-comp-fill-stable" style="width:{bar_st}%"></div>
                 </div>
             </div>
             <div class="cs-comp-card">
                 <div class="cs-comp-card-label">Crypto</div>
-                <div class="cs-comp-card-pct" style="color:#2E7D32">{comp.get("criptomoedas_pct","—")}</div>
-                <div class="cs-comp-card-val">{comp.get("criptomoedas","—")}</div>
+                <div class="cs-comp-card-pct" style="color:#2E7D32">{pct_cr_fmt}</div>
+                <div class="cs-comp-card-val">{val_cr}</div>
                 <div class="cs-comp-track">
                     <div class="cs-comp-fill-crypto" style="width:{bar_cr}%"></div>
                 </div>
@@ -232,40 +288,33 @@ def _renderizar_dashboard(d: dict, carteira: str):
         rows = []
         for t in tokens:
             rows.append({
-                "Symbol":    t.get("simbolo", "?"),
+                "Symbol":    t.get("simbolo","?"),
                 "Verified":  "✅" if t.get("verificado") else "⚠️",
-                "Amount":    t.get("quantidade", "N/A"),
-                "Price":     t.get("preco_atual", "N/A"),
-                "Value":     t.get("valor", "N/A"),
-                "Avg. Cost": t.get("custo_medio", "N/A"),
-                "P&L":       t.get("pnl", "N/A"),
-                "ROI":       t.get("roi", "N/A"),
+                "Amount":    _fmt2(str(t.get("quantidade","N/A"))),
+                "Price":     _fmt2(t.get("preco_atual","N/A")),
+                "Value":     _fmt2(t.get("valor","N/A")),
+                "Avg. Cost": _fmt2(t.get("custo_medio","N/A")),
+                "P&L":       _fmt2(t.get("pnl","N/A")),
+                "ROI":       _fmt2(t.get("roi","N/A")),
             })
 
         df = pd.DataFrame(rows)
 
         def _estilo_col(val):
-            try:
-                v = float(
-                    str(val)
-                    .replace("$","").replace("€","").replace("£","")
-                    .replace("%","").replace(",","").replace("+","").strip()
-                )
-                if v > 0: return "color: #2E7D32; font-weight: 700"
-                if v < 0: return "color: #C62828; font-weight: 700"
-            except Exception:
-                pass
+            v = _parse_float(str(val))
+            if v is None:
+                return ""
+            if v > 0: return "color: #2E7D32; font-weight: 700"
+            if v < 0: return "color: #C62828; font-weight: 700"
             return ""
 
-        # Top 3 sempre visível
         styled_top = (
             df.head(3).style
-            .map(_estilo_col, subset=["P&L", "ROI"])
+            .map(_estilo_col, subset=["P&L","ROI"])
             .set_properties(**{"font-size": "0.85rem"})
         )
         st.dataframe(styled_top, use_container_width=True, hide_index=True)
 
-        # Restante — locked, sem dados
         if len(df) > 3:
             with st.expander(f"🔒 {len(df) - 3} more tokens — Intermediate plan"):
                 st.markdown("""
@@ -275,7 +324,7 @@ def _renderizar_dashboard(d: dict, carteira: str):
                         Intermediate Plan required
                     </div>
                     <div style="font-size:0.85rem; color:#757575;">
-                        Upgrade to view your full token list, detailed P&L,
+                        Upgrade to view your full token list, detailed P&amp;L,
                         ROI per token and CSV export.
                     </div>
                 </div>""", unsafe_allow_html=True)
@@ -286,7 +335,7 @@ def _renderizar_dashboard(d: dict, carteira: str):
     dust = d.get("tokens_dust", [])
     if dust:
         with st.expander(f"🪣 Dust tokens ({len(dust)})"):
-            dust_rows = [{"Symbol": t.get("simbolo","?"), "Amount": t.get("quantidade","—")} for t in dust]
+            dust_rows = [{"Symbol": t.get("simbolo","?"), "Amount": _fmt2(str(t.get("quantidade","—")))} for t in dust]
             st.dataframe(pd.DataFrame(dust_rows), use_container_width=True, hide_index=True)
 
     # ── Footer ────
@@ -308,7 +357,7 @@ with st.form("form_carteira"):
             label_visibility="collapsed",
         )
     with col_m:
-        moeda = st.selectbox("Currency", ["USD", "EUR", "GBP"], label_visibility="collapsed")
+        moeda = st.selectbox("Currency", ["USD","EUR","GBP"], label_visibility="collapsed")
     with col_btn:
         submitted = st.form_submit_button("🔍 Analyse", use_container_width=True)
 
