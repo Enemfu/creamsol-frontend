@@ -210,14 +210,14 @@ def _renderizar_dashboard(d: dict):
         rows = []
         for t in tokens:
             rows.append({
-                "Symbol":       t["simbolo"],
-                "Verified":     "✅" if t["verificado"] else "⚠️",
-                "Amount":       t["quantidade"],
-                "Price":        t["preco_atual"],
-                "Value":        t["valor"],
-                "Avg. Cost":    t["custo_medio"],
-                "P&L":          t["pnl"],
-                "ROI":          t["roi"],
+                "Symbol":    t["simbolo"],
+                "Verified":  "✅" if t["verificado"] else "⚠️",
+                "Amount":    t["quantidade"],
+                "Price":     t["preco_atual"],
+                "Value":     t["valor"],
+                "Avg. Cost": t["custo_medio"],
+                "P&L":       t["pnl"],
+                "ROI":       t["roi"],
             })
 
         df = pd.DataFrame(rows)
@@ -229,8 +229,7 @@ def _renderizar_dashboard(d: dict):
                 v = float(
                     str(val)
                     .replace("$","").replace("€","").replace("£","")
-                    .replace("%","").replace(",","")
-                    .strip()
+                    .replace("%","").replace(",","").strip()
                 )
                 if v > 0: return "color: #2E7D32; font-weight: 700"
                 if v < 0: return "color: #C62828; font-weight: 700"
@@ -238,12 +237,27 @@ def _renderizar_dashboard(d: dict):
                 pass
             return ""
 
-        styled = (
-            df.style
+        # Top 3 sempre visível
+        top3 = df.head(3)
+        resto = df.iloc[3:]
+
+        styled_top = (
+            top3.style
             .map(_estilo_col, subset=["P&L", "ROI"])
             .set_properties(**{"font-size": "0.85rem"})
         )
-        st.dataframe(styled, use_container_width=True, hide_index=True)
+        st.dataframe(styled_top, use_container_width=True, hide_index=True)
+
+        # Restante oculto
+        if not resto.empty:
+            with st.expander(f"🔒 See all {len(df)} tokens — **Intermediate plan**"):
+                st.info("Upgrade to the Intermediate plan to view your full token list and detailed performance metrics.")
+                styled_rest = (
+                    resto.style
+                    .map(_estilo_col, subset=["P&L", "ROI"])
+                    .set_properties(**{"font-size": "0.85rem"})
+                )
+                st.dataframe(styled_rest, use_container_width=True, hide_index=True)
     else:
         st.info("No significant tokens found.")
 
