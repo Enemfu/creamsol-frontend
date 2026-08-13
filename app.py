@@ -109,17 +109,17 @@ section[data-testid="stSidebar"] {
 with st.sidebar:
     st.markdown('<div class="cs-logo" style="font-size:1.4rem">Cream<span>Sol</span>.io</div>', unsafe_allow_html=True)
     st.markdown("---")
-    st.markdown("**Navegação**")
-    st.page_link("app.py",                   label="🏠  Início",           icon=None)
-    st.page_link("pages/1_Iniciante.py",      label="🟢  Iniciante",        icon=None)
-    st.page_link("pages/2_Intermediario.py",  label="🔵  Intermediário",    icon=None)
-    st.page_link("pages/3_Profissional.py",   label="⚫  Profissional",     icon=None)
+    st.markdown("**Navigation**")
+    st.page_link("app.py",                   label="🏠  Home",             icon=None)
+    st.page_link("pages/1_Iniciante.py",      label="🟢  Beginner",         icon=None)
+    st.page_link("pages/2_Intermediario.py",  label="🔵  Intermediate",     icon=None)
+    st.page_link("pages/3_Profissional.py",   label="⚫  Professional",     icon=None)
     st.markdown("---")
     st.caption("v1.0.0 · creamsol.io")
 
 # ── Header ────
 st.markdown('<div class="cs-logo">Cream<span>Sol</span>.io</div>', unsafe_allow_html=True)
-st.markdown('<div class="cs-sub">Análise patrimonial de carteiras Solana · Dados em tempo real · Sem registo de dados</div>', unsafe_allow_html=True)
+st.markdown('<div class="cs-sub">Solana wallet analysis · Real-time data · No data stored</div>', unsafe_allow_html=True)
 st.markdown("---")
 
 # ── Cards de plano ────
@@ -128,48 +128,48 @@ col1, col2, col3 = st.columns(3, gap="medium")
 with col1:
     st.markdown("""
     <div class="cs-plan-card">
-        <span class="cs-plan-badge badge-free">Gratuito</span>
-        <div class="cs-plan-title">Iniciante</div>
+        <span class="cs-plan-badge badge-free">Free</span>
+        <div class="cs-plan-title">Beginner</div>
         <div class="cs-plan-desc">
-            Visão geral da carteira sem necessidade de conta ou autenticação.
+            Wallet overview with no account or authentication required.
         </div>
         <ul class="cs-plan-feat">
-            <li>Patrimônio total</li>
-            <li>Saldo por token</li>
-            <li>P&amp;L e custo médio</li>
-            <li>Composição (Stable / Cripto)</li>
-            <li>Tokens dust identificados</li>
-            <li>Múltiplas carteiras (até 3)</li>
-            <li class="nd">Relatório completo</li>
-            <li class="nd">Export CSV/JSON</li>
+            <li>Total portfolio value</li>
+            <li>Balance per token</li>
+            <li>P&amp;L and average cost</li>
+            <li>Composition (Stables / Crypto)</li>
+            <li>Dust tokens identified</li>
+            <li>Multiple wallets (up to 3)</li>
+            <li class="nd">Full report</li>
+            <li class="nd">CSV / JSON export</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
-    st.page_link("pages/1_Iniciante.py", label="🟢  Aceder ao Iniciante", use_container_width=True)
+    st.page_link("pages/1_Iniciante.py", label="🟢  Go to Beginner", use_container_width=True)
 
 with col2:
     st.markdown("""
     <div class="cs-plan-card">
-        <span class="cs-plan-badge badge-private">Privado</span>
-        <div class="cs-plan-title">Intermediário</div>
+        <span class="cs-plan-badge badge-private">Private</span>
+        <div class="cs-plan-title">Intermediate</div>
         <div class="cs-plan-desc">
-            Performance detalhada com estatísticas avançadas. Acesso por senha.
+            Detailed performance with advanced statistics. Password protected.
         </div>
         <ul class="cs-plan-feat">
-            <li>Tudo do Iniciante</li>
-            <li>Performance por token</li>
-            <li>Lucro realizado e não realizado</li>
-            <li>Volume de compra / venda</li>
-            <li>Taxas pagas (SOL/USD)</li>
-            <li>ROI médio global</li>
-            <li>Export CSV</li>
-            <li class="nd">Histórico de transacções</li>
+            <li>Everything in Beginner</li>
+            <li>Performance per token</li>
+            <li>Realised and unrealised profit</li>
+            <li>Buy / sell volume</li>
+            <li>Fees paid (SOL/USD)</li>
+            <li>Global average ROI</li>
+            <li>CSV export</li>
+            <li class="nd">Transaction history</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
-    st.page_link("pages/2_Intermediario.py", label="🔵  Aceder ao Intermediário", use_container_width=True)
+    st.page_link("pages/2_Intermediario.py", label="🔵  Go to Intermediate", use_container_width=True)
 
 with col3:
     st.markdown("""
