@@ -219,12 +219,9 @@ def _renderizar_dashboard(d: dict):
                 "P&L":       t["pnl"],
                 "ROI":       t["roi"],
             })
-
         df = pd.DataFrame(rows)
 
         def _estilo_col(val):
-            if str(val) in ("N/A", ""):
-                return "color: #BDBDBD"
             try:
                 v = float(
                     str(val)
@@ -236,6 +233,15 @@ def _renderizar_dashboard(d: dict):
             except Exception:
                 pass
             return ""
+
+        styled = (
+            df.style
+            .map(_estilo_col, subset=["P&L", "ROI"])
+            .set_properties(**{"font-size": "0.85rem"})
+        )
+        st.dataframe(styled, use_container_width=True, hide_index=True)
+    else:
+        st.info("No significant tokens found.")
 
         # Top 3 sempre visível
         top3 = df.head(3)
