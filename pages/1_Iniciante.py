@@ -59,7 +59,6 @@ st.markdown("""
     color: #9E9E9E; margin: 1.6rem 0 0.6rem 0;
 }
 
-/* Composition cards — side by side */
 .cs-comp-row { display: flex; gap: 1rem; margin-top: 0.4rem; }
 .cs-comp-card {
     flex: 1; background: #FFFFFF; border: 1px solid #E0E0E0;
@@ -122,54 +121,53 @@ st.markdown("---")
 # Helpers
 # ──────────────────────────────────────────
 def _parse_float(val_str: str) -> float | None:
-    """Extrai float de qualquer string formatada: '$1,234.56', '-€20.00', '12.3%'."""
+    """Extrai float de strings como '$1,234.56', '-€20.00', '+12.3%'."""
     try:
         cleaned = (
             str(val_str)
             .replace("$", "").replace("€", "").replace("£", "")
-            .replace("%", "").replace(",", "").replace("+", "")
-            .replace("<", "").replace("—", "").strip()
+            .replace("%", "").replace(",", "")
+            .replace("+", "").replace("<", "")
+            .strip()
         )
         return float(cleaned)
     except Exception:
         return None
 
 
-def _fmt2(val_str: str, prefix: str = "", suffix: str = "") -> str:
+def _fmt2(val_str: str) -> str:
     """
     Reformata qualquer valor numérico para 2 casas decimais.
-    Preserva sinal, prefixo monetário e sufixo (%).
-    Valores não numéricos (N/A, N/D, —) passam sem alteração.
+    Preserva: sinal (+ / -), prefixo monetário ($, €, £), sufixo (%).
+    Valores não numéricos passam sem alteração.
     """
     s = str(val_str).strip()
-    if s in ("N/A", "N/D", "—", "", "?", "N/D"):
+    if s in ("N/A", "N/D", "—", "", "?"):
         return s
 
-    # Detecta prefixo monetário original
-    detected_prefix = ""
+    # Detecta prefixo monetário
+    prefix = ""
     for sym in ("$", "€", "£"):
         if sym in s:
-            detected_prefix = sym
+            prefix = sym
             break
 
     # Detecta sufixo
-    detected_suffix = "%" if "%" in s else ""
+    suffix = "%" if "%" in s else ""
 
-    # Detecta sinal
+    # Detecta sinal explícito
     sign = ""
-    stripped = s.lstrip("$€£").strip()
-    if stripped.startswith("+"):
+    core = s.replace(prefix, "").strip()
+    if core.startswith("+"):
         sign = "+"
-    elif stripped.startswith("-") or s.startswith("-"):
+    elif core.startswith("-") or s.startswith("-"):
         sign = "-"
 
     v = _parse_float(s)
     if v is None:
         return s
 
-    p  = prefix  or detected_prefix
-    su = suffix  or detected_suffix
-    return f"{sign}{p}{abs(v):,.2f}{su}"
+    return f"{sign}{prefix}{abs(v):,.2f}{suffix}"
 
 
 def _cor(valor_str: str) -> str:
@@ -177,15 +175,27 @@ def _cor(valor_str: str) -> str:
     s = str(valor_str).strip()
     if s in ("N/A", "N/D", "—", "", "?"):
         return "nd"
+    # Verifica sinal explícito antes de parsear
+    has_minus = "-" in s
     v = _parse_float(s)
     if v is None:
         return "nd"
+    # Se a string tem '-' mas _parse_float removeu-o, v pode ser positivo
+    # — forçamos negativo se '-' estava presente
+    if has_minus:
+        v = -abs(v)
     return "pos" if v > 0 else ("neg" if v < 0 else "")
 
 
-def _metrica(label: str, valor: str, sub: str = "", forcar_neg: bool = False):
-    """Renderiza um card de métrica com label, valor formatado e sub-texto opcional."""
-    cor    = "neg" if forcar_neg else _cor(valor)
+def _metrica(label: str, valor: str, sub: str = "",
+             forcar_neg: bool = False, neutral: bool = False):
+    """Card de métrica. neutral=True → sem coloração (sempre preto)."""
+    if neutral:
+        cor = ""
+    elif forcar_neg:
+        cor = "neg"
+    else:
+        cor = _cor(valor)
     valor_fmt = _fmt2(valor)
     sub_html  = f'<div class="cs-metric-sub">{sub}</div>' if sub else ""
     st.markdown(f"""
@@ -201,18 +211,43 @@ def _pct_float(pct_str: str) -> float:
     return max(0.0, min(100.0, v)) if v is not None else 0.0
 
 
-def _delta_tokens_fmt(delta_tok) -> str:
-    """Formata delta de tokens com sinal explícito."""
-    try:
-        dt = int(str(delta_tok).replace("+", "").replace("—", "").strip())
-        return f"+{dt}" if dt > 0 else str(dt)
-    except Exception:
-        return str(delta_tok) if delta_tok not in (None, "—", "") else "—"
+def _comp_pct_fmt(pct_str: str) -> str:
+    """
+    Formata percentagem de composição:
+    - Sem sinal (sempre positivo)
+    - Sem duplo '%'
+    - 2 casas decimais
+    """
+    s = str(pct_str).strip().replace("+", "")
+    v = _parse_float(s)
+    if v is None:
+        return s.replace("%", "") + "%"
+    return f"{abs(v):.2f}%"
 
 
-# ──────────────────────────────────────────
-# API
-# ──────────────────────────────────────────
+def _neg_valor(valor_str: str) -> str:
+    """
+    Garante que o valor tem sinal negativo na string exibida.
+    Ex: '$91.95' → '-$91.95' | '-$91.95' → '-$91.95'
+    """
+    s = str(valor_str).strip()
+    if s in ("N/A", "N/D", "—", "", "?"):
+        return s
+    # Já tem sinal negativo
+    if s.startswith("-") or (len(s) > 1 and s[1:].lstrip("$€£").startswith("-")):
+        return _fmt2(s)
+    # Adiciona sinal negativo
+    prefix = ""
+    for sym in ("$", "€", "£"):
+        if sym in s:
+            prefix = sym
+            break
+    v = _parse_float(s)
+    if v is None:
+        return s
+    return f"-{prefix}{abs(v):,.2f}"
+
+
 def _chamar_api(carteira: str, moeda: str) -> dict | None:
     try:
         url  = f"{API_BASE_URL}/v1/iniciante/{carteira}?moeda={moeda}"
@@ -237,14 +272,14 @@ def _chamar_api(carteira: str, moeda: str) -> dict | None:
 # ──────────────────────────────────────────
 def _renderizar_dashboard(d: dict, carteira: str):
 
-    # ── Extrai dados SOL da lista de tokens ────
+    # ── Extrai SOL da lista de tokens ────
     sol_amount_raw = "—"
     sol_valor_raw  = "—"
     for t in d.get("tokens", []):
         simbolo_limpo = str(t.get("simbolo", "")).replace("⚠️ ", "").strip().upper()
         if simbolo_limpo in ("SOL", "WSOL"):
             q = t.get("quantidade", None)
-            sol_amount_raw = f"{float(q):.6f}" if isinstance(q, (int, float)) else str(q or "—")
+            sol_amount_raw = f"{float(q):.2f}" if isinstance(q, (int, float)) else str(q or "—")
             sol_valor_raw  = t.get("valor", "—")
             break
 
@@ -256,53 +291,50 @@ def _renderizar_dashboard(d: dict, carteira: str):
     n_tokens_atual = d.get("n_tokens", "—")
     c1, c2, c3, c4 = st.columns(4, gap="small")
     with c1:
-        _metrica(
-            "Total Portfolio",
-            d.get("patrimonio_total", "N/A"),
-            sub=f"{n_tokens_atual} tokens",
-        )
+        _metrica("Total Portfolio", d.get("patrimonio_total", "N/A"),
+                 sub=f"{n_tokens_atual} tokens")
     with c2:
-        _metrica(
-            "SOL Balance",
-            sol_valor_raw,
-            sub=f"{sol_amount_raw} SOL",
-        )
+        # SOL Balance: valor em USD normal, amount em SOL neutro
+        _metrica("SOL Balance", sol_valor_raw,
+                 sub=f"{sol_amount_raw} SOL")
     with c3:
         _metrica("Total P&L", d.get("pnl_total", "N/A"))
     with c4:
-        _metrica(
-            "Fees Paid",
-            d.get("total_taxas_usd", "N/A"),
-            forcar_neg=True,
-        )
+        _metrica("Fees Paid", _neg_valor(d.get("total_taxas_usd", "N/A")),
+                 forcar_neg=True)
 
     # ─────────────────────────────────────
     # SECTION 2 — 30-Day Comparison
     # ─────────────────────────────────────
     st.markdown('<div class="cs-section-title">30-Day Comparison</div>', unsafe_allow_html=True)
 
-    pat_atual  = d.get("patrimonio_total", "—")
-    pat_30d    = d.get("patrimonio_30d",   "N/D")
-    n_atual    = d.get("n_tokens",         "—")
-    n_30d      = d.get("n_tokens_30d",     "—")
-    delta_tok  = d.get("delta_tokens",     "—")
-    delta_tok_fmt = _delta_tokens_fmt(delta_tok)
+    pat_atual = d.get("patrimonio_total", "—")
+    pat_30d   = d.get("patrimonio_30d",   "N/D")
+    n_atual   = d.get("n_tokens",         "—")
+    n_30d     = d.get("n_tokens_30d",     "—")
+    delta_tok = d.get("delta_tokens",     "—")
 
-    # Calcula delta_valor com sinal correcto a partir dos floats
+    # Formato delta tokens
+    try:
+        dt_int = int(str(delta_tok).replace("+", "").replace("—", "").strip())
+        delta_tok_fmt = f"+{dt_int}" if dt_int > 0 else str(dt_int)
+    except Exception:
+        delta_tok_fmt = str(delta_tok) if delta_tok not in (None, "—", "") else "—"
+
+    # Calcula delta_valor com sinal correcto (atual − 30d)
     pat_atual_v = _parse_float(str(pat_atual)) or 0.0
     pat_30d_v   = _parse_float(str(pat_30d))   or 0.0
 
     if pat_30d_v > 0:
-        delta_calc = pat_atual_v - pat_30d_v
-        # Detecta símbolo monetário do patrimonio_total
+        delta_calc = pat_atual_v - pat_30d_v          # pode ser negativo
         sym = ""
         for s in ("$", "€", "£"):
             if s in str(pat_atual):
                 sym = s
                 break
-        delta_val = f"{'+' if delta_calc >= 0 else ''}{sym}{abs(delta_calc):,.2f}"
+        sign_str   = "+" if delta_calc >= 0 else "-"  # sinal explícito
+        delta_val  = f"{sign_str}{sym}{abs(delta_calc):,.2f}"
     else:
-        # Fallback: usa o que a API devolveu
         delta_val = d.get("delta_valor", "—")
 
     m1, m2, m3 = st.columns(3, gap="small")
@@ -311,34 +343,36 @@ def _renderizar_dashboard(d: dict, carteira: str):
     with m2:
         _metrica("30d ago", pat_30d,   sub=f"{n_30d} tokens" if n_30d != "—" else "—")
     with m3:
-        _metrica("Change",  delta_val, sub=f"{delta_tok_fmt} tokens")
+        # Change: positivo=verde, negativo=vermelho (cor automática via _cor)
+        _metrica("Change", delta_val, sub=f"{delta_tok_fmt} tokens")
 
     # ─────────────────────────────────────
     # SECTION 3 — Details
     # ─────────────────────────────────────
     st.markdown('<div class="cs-section-title">Details</div>', unsafe_allow_html=True)
 
+    # Fees SOL — 2 casas decimais + sinal negativo
     taxas_sol_raw = d.get("total_taxas_sol", 0)
     try:
-        taxas_sol_fmt = f"{float(taxas_sol_raw):.6f} SOL"
+        taxas_sol_fmt = f"-{abs(float(taxas_sol_raw)):,.2f} SOL"
     except Exception:
         taxas_sol_fmt = str(taxas_sol_raw)
 
     d1, d2, d3, d4 = st.columns(4, gap="small")
     with d1:
-        _metrica("SOL (amount)", sol_amount_raw)
+        # SOL Amount — neutro (não é ganho nem perda)
+        _metrica("SOL (amount)", sol_amount_raw, neutral=True)
     with d2:
-        _metrica("Fees (SOL)",    taxas_sol_fmt,                        forcar_neg=True)
+        _metrica("Fees (SOL)",    taxas_sol_fmt,                              forcar_neg=True)
     with d3:
-        _metrica("Est. Slippage", d.get("total_slippage_usd", "—"),     forcar_neg=True)
+        _metrica("Est. Slippage", _neg_valor(d.get("total_slippage_usd", "—")), forcar_neg=True)
     with d4:
-        _metrica("Moved (USD)",   d.get("total_movimentado_usd", "—"),  forcar_neg=True)
+        _metrica("Moved (USD)",   _neg_valor(d.get("total_movimentado_usd", "—")), forcar_neg=True)
 
     # ─────────────────────────────────────
     # SECTION 4 — Composition
     # ─────────────────────────────────────
     comp = d.get("composicao", {})
-    # Defesa: a API pode devolver dict ou objeto
     if isinstance(comp, list):
         comp = {}
     if comp:
@@ -346,16 +380,17 @@ def _renderizar_dashboard(d: dict, carteira: str):
 
         pct_st     = _pct_float(comp.get("stablecoins_pct",  "0"))
         pct_cr     = _pct_float(comp.get("criptomoedas_pct", "0"))
-        val_st_fmt = _fmt2(comp.get("stablecoins",      "—"))
-        val_cr_fmt = _fmt2(comp.get("criptomoedas",     "—"))
-        pct_st_fmt = _fmt2(comp.get("stablecoins_pct",  "—"))
-        pct_cr_fmt = _fmt2(comp.get("criptomoedas_pct", "—"))
+        # _comp_pct_fmt: sem sinal, sem duplo %, 2dp
+        pct_st_fmt = _comp_pct_fmt(comp.get("stablecoins_pct",  "0"))
+        pct_cr_fmt = _comp_pct_fmt(comp.get("criptomoedas_pct", "0"))
+        val_st_fmt = _fmt2(comp.get("stablecoins",  "—"))
+        val_cr_fmt = _fmt2(comp.get("criptomoedas", "—"))
 
         st.markdown(f"""
         <div class="cs-comp-row">
             <div class="cs-comp-card">
                 <div class="cs-comp-card-label">Stablecoins</div>
-                <div class="cs-comp-card-pct" style="color:#1565C0">{pct_st_fmt}%</div>
+                <div class="cs-comp-card-pct" style="color:#1565C0">{pct_st_fmt}</div>
                 <div class="cs-comp-card-val">{val_st_fmt}</div>
                 <div class="cs-comp-track">
                     <div class="cs-comp-fill-stable" style="width:{pct_st:.1f}%"></div>
@@ -363,7 +398,7 @@ def _renderizar_dashboard(d: dict, carteira: str):
             </div>
             <div class="cs-comp-card">
                 <div class="cs-comp-card-label">Crypto</div>
-                <div class="cs-comp-card-pct" style="color:#2E7D32">{pct_cr_fmt}%</div>
+                <div class="cs-comp-card-pct" style="color:#2E7D32">{pct_cr_fmt}</div>
                 <div class="cs-comp-card-val">{val_cr_fmt}</div>
                 <div class="cs-comp-track">
                     <div class="cs-comp-fill-crypto" style="width:{pct_cr:.1f}%"></div>
@@ -386,7 +421,7 @@ def _renderizar_dashboard(d: dict, carteira: str):
                 "Verified":  "✅" if t.get("verificado") else "⚠️",
                 "Amount":    _fmt2(str(t.get("quantidade", "N/A"))),
                 "Price":     _fmt2(t.get("preco_atual", "N/A")),
-                "Value":     _fmt2(t.get("valor", "N/A")),
+                "Value":     _fmt2(t.get("valor",       "N/A")),
                 "Avg. Cost": _fmt2(t.get("custo_medio", "N/A")),
                 "P&L":       _fmt2(t.get("pnl", "N/A")),
                 "ROI":       _fmt2(t.get("roi", "N/A")),
@@ -395,16 +430,20 @@ def _renderizar_dashboard(d: dict, carteira: str):
         df = pd.DataFrame(rows)
 
         def _estilo_col(val):
-            v = _parse_float(str(val))
+            # Verifica sinal via string antes de parsear
+            s = str(val)
+            has_minus = "-" in s
+            v = _parse_float(s)
             if v is None:
                 return ""
+            if has_minus:
+                v = -abs(v)
             if v > 0:
                 return "color: #2E7D32; font-weight: 700"
             if v < 0:
                 return "color: #C62828; font-weight: 700"
             return ""
 
-        # Top 3 visível
         styled_top = (
             df.head(3).style
             .map(_estilo_col, subset=["P&L", "ROI"])
@@ -412,7 +451,6 @@ def _renderizar_dashboard(d: dict, carteira: str):
         )
         st.dataframe(styled_top, use_container_width=True, hide_index=True)
 
-        # Restante — locked
         if len(df) > 3:
             with st.expander(f"🔒 {len(df) - 3} more tokens — Intermediate plan required"):
                 st.markdown("""
