@@ -21,11 +21,9 @@ st.markdown("""
 .stApp { background-color: #F5F5F5; }
 .block-container { padding-top: 1.8rem; padding-bottom: 2rem; max-width: 1100px; }
 
-/* Logo */
 .cs-logo { font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; color: #1A1A1A; }
 .cs-logo span { color: #2E7D32; }
 
-/* Badge */
 .cs-badge {
     display: inline-block;
     font-size: 0.7rem; font-weight: 700;
@@ -35,7 +33,6 @@ st.markdown("""
     margin-left: 0.6rem; vertical-align: middle;
 }
 
-/* Metric card */
 .cs-metric {
     background: #FFFFFF; border: 1px solid #E0E0E0;
     border-radius: 10px; padding: 1rem 1.2rem;
@@ -50,21 +47,19 @@ st.markdown("""
 .cs-metric-valor.neg { color: #C62828; }
 .cs-metric-valor.nd  { color: #BDBDBD; font-size: 1.05rem; font-weight: 500; }
 
-/* Section title */
 .cs-section-title {
     font-size: 0.78rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.1em;
     color: #9E9E9E; margin: 1.4rem 0 0.6rem 0;
 }
 
-/* Composition bar */
 .cs-comp-bar {
     display: flex; align-items: center; gap: 0.6rem;
     margin-bottom: 0.45rem;
 }
 .cs-comp-label {
     font-size: 0.82rem; font-weight: 600;
-    color: #1A1A1A; min-width: 60px;
+    color: #1A1A1A; min-width: 100px;
 }
 .cs-comp-track {
     flex: 1; height: 7px; background: #EEEEEE;
@@ -79,7 +74,6 @@ st.markdown("""
     min-width: 38px; text-align: right;
 }
 
-/* Footer / disclaimer */
 .cs-aviso {
     background: #FAFAFA; border-left: 3px solid #BDBDBD;
     padding: 0.6rem 1rem; color: #9E9E9E;
@@ -87,7 +81,6 @@ st.markdown("""
     margin-top: 1.5rem;
 }
 
-/* Sidebar */
 section[data-testid="stSidebar"] {
     background-color: #FFFFFF; border-right: 1px solid #E0E0E0;
 }
@@ -121,13 +114,13 @@ st.markdown("---")
 
 # ── Helpers ────
 def _cor(valor_str: str) -> str:
-    if not valor_str or str(valor_str).strip() in ("N/A", "", "—"):
+    if not valor_str or str(valor_str).strip() in ("N/A", "N/D", "", "—"):
         return "nd"
     try:
         v = float(
             str(valor_str)
             .replace("$","").replace("€","").replace("£","")
-            .replace("%","").replace(",","").replace("<","").strip()
+            .replace("%","").replace(",","").replace("<","").replace("+","").strip()
         )
         return "pos" if v > 0 else ("neg" if v < 0 else "")
     except Exception:
@@ -140,6 +133,22 @@ def _metrica(label: str, valor: str):
     <div class="cs-metric">
         <div class="cs-metric-label">{label}</div>
         <div class="cs-metric-valor {cor}">{valor}</div>
+    </div>""", unsafe_allow_html=True)
+
+
+def _barra(label: str, valor: str, pct: str):
+    try:
+        pct_val = float(str(pct).replace("%","").replace(",",".").strip())
+    except Exception:
+        pct_val = 0.0
+    bar_w = min(max(pct_val, 0), 100)
+    st.markdown(f"""
+    <div class="cs-comp-bar">
+        <div class="cs-comp-label">{label}</div>
+        <div class="cs-comp-track">
+            <div class="cs-comp-fill" style="width:{bar_w}%"></div>
+        </div>
+        <div class="cs-comp-pct">{pct}</div>
     </div>""", unsafe_allow_html=True)
 
 
@@ -164,7 +173,8 @@ def _chamar_api(carteira: str, moeda: str) -> dict | None:
 
 
 def _renderizar_dashboard(d: dict, carteira: str):
-    # ── Key metrics ────
+
+    # ── Portfolio Overview ────
     st.markdown('<div class="cs-section-title">Portfolio Overview</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4, gap="small")
     with c1: _metrica("Total Portfolio",  d.get("patrimonio_total", "N/A"))
@@ -172,35 +182,28 @@ def _renderizar_dashboard(d: dict, carteira: str):
     with c3: _metrica("Total P&L",        d.get("pnl_total", "N/A"))
     with c4: _metrica("Fees Paid",        d.get("total_taxas_usd", "N/A"))
 
-    # ── Secondary metrics ────
+    # ── 30-day comparison ────
+    st.markdown('<div class="cs-section-title">30-Day Comparison</div>', unsafe_allow_html=True)
+    m1, m2, m3 = st.columns(3, gap="small")
+    with m1: _metrica("Portfolio (30d ago)", d.get("patrimonio_30d", "N/D"))
+    with m2: _metrica("Change (30d)",        d.get("delta_valor", "—"))
+    with m3: _metrica("Tokens (30d ago)",    d.get("n_tokens_30d", "—"))
+
+    # ── Details ────
     st.markdown('<div class="cs-section-title">Details</div>', unsafe_allow_html=True)
     d1, d2, d3, d4 = st.columns(4, gap="small")
-    with d1: _metrica("SOL (amount)",    f"{d.get('saldo_sol', 0):.6f}")
+    with d1: _metrica("SOL (amount)",    f"{d.get('total_taxas_sol', 0):.6f}")
     with d2: _metrica("Fees (SOL)",      f"{d.get('total_taxas_sol', 0):.6f}")
-    with d3: _metrica("Est. Slippage",   d.get("total_slippage_usd", "N/A"))
+    with d3: _metrica("Est. Slippage",   d.get("total_slippage_usd", "—"))
     with d4: _metrica("Tokens",          str(d.get("n_tokens", "N/A")))
 
     # ── Composition ────
-    composicao = d.get("composicao", [])
-    if composicao:
+    comp = d.get("composicao", {})
+    if comp:
         st.markdown('<div class="cs-section-title">Composition</div>', unsafe_allow_html=True)
-        for item in composicao:
-            simbolo = item.get("simbolo", "?")
-            pct_raw = item.get("percentual", "0%")
-            try:
-                pct_val = float(str(pct_raw).replace("%","").replace(",",".").strip())
-            except Exception:
-                pct_val = 0.0
-            pct_display = f"{pct_val:.1f}%"
-            bar_w = min(max(pct_val, 0), 100)
-            st.markdown(f"""
-            <div class="cs-comp-bar">
-                <div class="cs-comp-label">{simbolo}</div>
-                <div class="cs-comp-track">
-                    <div class="cs-comp-fill" style="width:{bar_w}%"></div>
-                </div>
-                <div class="cs-comp-pct">{pct_display}</div>
-            </div>""", unsafe_allow_html=True)
+        # A API devolve um objecto com 4 campos: stablecoins, stablecoins_pct, criptomoedas, criptomoedas_pct
+        _barra("Stablecoins",   comp.get("stablecoins", "—"),   comp.get("stablecoins_pct", "0%"))
+        _barra("Crypto",        comp.get("criptomoedas", "—"),  comp.get("criptomoedas_pct", "0%"))
 
     # ── Tokens table ────
     st.markdown('<div class="cs-section-title">Tokens</div>', unsafe_allow_html=True)
@@ -226,7 +229,7 @@ def _renderizar_dashboard(d: dict, carteira: str):
                 v = float(
                     str(val)
                     .replace("$","").replace("€","").replace("£","")
-                    .replace("%","").replace(",","").strip()
+                    .replace("%","").replace(",","").replace("+","").strip()
                 )
                 if v > 0: return "color: #2E7D32; font-weight: 700"
                 if v < 0: return "color: #C62828; font-weight: 700"
@@ -240,8 +243,16 @@ def _renderizar_dashboard(d: dict, carteira: str):
             .set_properties(**{"font-size": "0.85rem"})
         )
         st.dataframe(styled, use_container_width=True, hide_index=True)
+
     else:
         st.info("No significant tokens found in this wallet.")
+
+    # ── Dust tokens ────
+    dust = d.get("tokens_dust", [])
+    if dust:
+        with st.expander(f"🪣 Dust tokens ({len(dust)})"):
+            dust_rows = [{"Symbol": t.get("simbolo","?"), "Amount": t.get("quantidade","—")} for t in dust]
+            st.dataframe(pd.DataFrame(dust_rows), use_container_width=True, hide_index=True)
 
     # ── Footer ────
     st.markdown(f"""
