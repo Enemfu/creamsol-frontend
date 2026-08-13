@@ -53,6 +53,31 @@ st.markdown("""
     margin-top: 0.25rem; font-weight: 500;
 }
 
+/* ── Tooltip ── */
+.cs-tooltip-wrap {
+    position: relative; display: inline-block;
+    margin-left: 5px; cursor: help;
+}
+.cs-tooltip-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #E0E0E0; color: #757575;
+    font-size: 0.6rem; font-weight: 800; line-height: 1;
+    vertical-align: middle;
+}
+.cs-tooltip-box {
+    visibility: hidden; opacity: 0;
+    background: #1A1A1A; color: #FFFFFF;
+    font-size: 0.72rem; line-height: 1.4;
+    border-radius: 6px; padding: 6px 10px;
+    width: 200px;
+    position: absolute; z-index: 999;
+    bottom: 125%; left: 50%; transform: translateX(-50%);
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+}
+.cs-tooltip-wrap:hover .cs-tooltip-box { visibility: visible; opacity: 1; }
+
 .cs-section-title {
     font-size: 0.78rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.1em;
@@ -145,17 +170,14 @@ def _fmt2(val_str: str) -> str:
     if s in ("N/A", "N/D", "—", "", "?"):
         return s
 
-    # Detecta prefixo monetário
     prefix = ""
     for sym in ("$", "€", "£"):
         if sym in s:
             prefix = sym
             break
 
-    # Detecta sufixo
     suffix = "%" if "%" in s else ""
 
-    # Detecta sinal explícito
     sign = ""
     core = s.replace(prefix, "").strip()
     if core.startswith("+"):
@@ -175,32 +197,45 @@ def _cor(valor_str: str) -> str:
     s = str(valor_str).strip()
     if s in ("N/A", "N/D", "—", "", "?"):
         return "nd"
-    # Verifica sinal explícito antes de parsear
     has_minus = "-" in s
     v = _parse_float(s)
     if v is None:
         return "nd"
-    # Se a string tem '-' mas _parse_float removeu-o, v pode ser positivo
-    # — forçamos negativo se '-' estava presente
     if has_minus:
         v = -abs(v)
     return "pos" if v > 0 else ("neg" if v < 0 else "")
 
 
 def _metrica(label: str, valor: str, sub: str = "",
-             forcar_neg: bool = False, neutral: bool = False):
-    """Card de métrica. neutral=True → sem coloração (sempre preto)."""
+             forcar_neg: bool = False, neutral: bool = False,
+             tooltip: str = ""):
+    """
+    Card de métrica.
+    neutral=True  → sem coloração (sempre preto).
+    forcar_neg    → força classe CSS 'neg' (vermelho).
+    tooltip       → mostra bolinha '?' com texto ao hover.
+    """
     if neutral:
         cor = ""
     elif forcar_neg:
         cor = "neg"
     else:
         cor = _cor(valor)
+
     valor_fmt = _fmt2(valor)
     sub_html  = f'<div class="cs-metric-sub">{sub}</div>' if sub else ""
+
+    if tooltip:
+        tip_html = f"""<span class="cs-tooltip-wrap">
+            <span class="cs-tooltip-icon">?</span>
+            <span class="cs-tooltip-box">{tooltip}</span>
+        </span>"""
+    else:
+        tip_html = ""
+
     st.markdown(f"""
     <div class="cs-metric">
-        <div class="cs-metric-label">{label}</div>
+        <div class="cs-metric-label">{label}{tip_html}</div>
         <div class="cs-metric-valor {cor}">{valor_fmt}</div>
         {sub_html}
     </div>""", unsafe_allow_html=True)
@@ -214,9 +249,7 @@ def _pct_float(pct_str: str) -> float:
 def _comp_pct_fmt(pct_str: str) -> str:
     """
     Formata percentagem de composição:
-    - Sem sinal (sempre positivo)
-    - Sem duplo '%'
-    - 2 casas decimais
+    sem sinal, sem duplo '%', 2 casas decimais.
     """
     s = str(pct_str).strip().replace("+", "")
     v = _parse_float(s)
@@ -233,10 +266,8 @@ def _neg_valor(valor_str: str) -> str:
     s = str(valor_str).strip()
     if s in ("N/A", "N/D", "—", "", "?"):
         return s
-    # Já tem sinal negativo
-    if s.startswith("-") or (len(s) > 1 and s[1:].lstrip("$€£").startswith("-")):
+    if s.startswith("-"):
         return _fmt2(s)
-    # Adiciona sinal negativo
     prefix = ""
     for sym in ("$", "€", "£"):
         if sym in s:
@@ -291,17 +322,32 @@ def _renderizar_dashboard(d: dict, carteira: str):
     n_tokens_atual = d.get("n_tokens", "—")
     c1, c2, c3, c4 = st.columns(4, gap="small")
     with c1:
-        _metrica("Total Portfolio", d.get("patrimonio_total", "N/A"),
-                 sub=f"{n_tokens_atual} tokens")
+        _metrica(
+            "Total Portfolio",
+            d.get("patrimonio_total", "N/A"),
+            sub=f"{n_tokens_atual} tokens",
+            tooltip="Total estimated value of all tokens in your wallet at current market prices.",
+        )
     with c2:
-        # SOL Balance: valor em USD normal, amount em SOL neutro
-        _metrica("SOL Balance", sol_valor_raw,
-                 sub=f"{sol_amount_raw} SOL")
+        _metrica(
+            "SOL Balance",
+            sol_valor_raw,
+            sub=f"{sol_amount_raw} SOL",
+            tooltip="Current value and amount of native SOL held in your wallet.",
+        )
     with c3:
-        _metrica("Total P&L", d.get("pnl_total", "N/A"))
+        _metrica(
+            "Total P&L",
+            d.get("pnl_total", "N/A"),
+            tooltip="Estimated profit or loss based on the difference between current value and average cost of all tokens.",
+        )
     with c4:
-        _metrica("Fees Paid", _neg_valor(d.get("total_taxas_usd", "N/A")),
-                 forcar_neg=True)
+        _metrica(
+            "Fees Paid",
+            _neg_valor(d.get("total_taxas_usd", "N/A")),
+            forcar_neg=True,
+            tooltip="Total USD equivalent of all network fees (gas) paid across your transaction history.",
+        )
 
     # ─────────────────────────────────────
     # SECTION 2 — 30-Day Comparison
@@ -326,25 +372,39 @@ def _renderizar_dashboard(d: dict, carteira: str):
     pat_30d_v   = _parse_float(str(pat_30d))   or 0.0
 
     if pat_30d_v > 0:
-        delta_calc = pat_atual_v - pat_30d_v          # pode ser negativo
+        delta_calc = pat_atual_v - pat_30d_v
         sym = ""
         for s in ("$", "€", "£"):
             if s in str(pat_atual):
                 sym = s
                 break
-        sign_str   = "+" if delta_calc >= 0 else "-"  # sinal explícito
-        delta_val  = f"{sign_str}{sym}{abs(delta_calc):,.2f}"
+        sign_str  = "+" if delta_calc >= 0 else "-"
+        delta_val = f"{sign_str}{sym}{abs(delta_calc):,.2f}"
     else:
         delta_val = d.get("delta_valor", "—")
 
     m1, m2, m3 = st.columns(3, gap="small")
     with m1:
-        _metrica("Now",     pat_atual, sub=f"{n_atual} tokens")
+        _metrica(
+            "Now",
+            pat_atual,
+            sub=f"{n_atual} tokens",
+            tooltip="Current total portfolio value at today's market prices.",
+        )
     with m2:
-        _metrica("30d ago", pat_30d,   sub=f"{n_30d} tokens" if n_30d != "—" else "—")
+        _metrica(
+            "30d ago",
+            pat_30d,
+            sub=f"{n_30d} tokens" if n_30d != "—" else "—",
+            tooltip="Estimated portfolio value 30 days ago, based on your on-chain transaction history.",
+        )
     with m3:
-        # Change: positivo=verde, negativo=vermelho (cor automática via _cor)
-        _metrica("Change", delta_val, sub=f"{delta_tok_fmt} tokens")
+        _metrica(
+            "Change",
+            delta_val,
+            sub=f"{delta_tok_fmt} tokens",
+            tooltip="Difference between current portfolio value and the estimated value 30 days ago.",
+        )
 
     # ─────────────────────────────────────
     # SECTION 3 — Details
@@ -360,14 +420,36 @@ def _renderizar_dashboard(d: dict, carteira: str):
 
     d1, d2, d3, d4 = st.columns(4, gap="small")
     with d1:
-        # SOL Amount — neutro (não é ganho nem perda)
-        _metrica("SOL (amount)", sol_amount_raw, neutral=True)
+        _metrica(
+            "SOL (amount)",
+            sol_amount_raw,
+            neutral=True,
+            tooltip="Amount of native SOL currently held in your wallet.",
+        )
     with d2:
-        _metrica("Fees (SOL)",    taxas_sol_fmt,                              forcar_neg=True)
+        _metrica(
+            "Fees (SOL)",
+            taxas_sol_fmt,
+            forcar_neg=True,
+            sub="last 90 days",
+            tooltip="Total SOL spent on network gas fees across all transactions in the last 90 days.",
+        )
     with d3:
-        _metrica("Est. Slippage", _neg_valor(d.get("total_slippage_usd", "—")), forcar_neg=True)
+        _metrica(
+            "Est. Slippage",
+            _neg_valor(d.get("total_slippage_usd", "—")),
+            forcar_neg=True,
+            sub="last 90 days",
+            tooltip="Estimated USD value lost to price slippage during token swaps in the last 90 days.",
+        )
     with d4:
-        _metrica("Moved (USD)",   _neg_valor(d.get("total_movimentado_usd", "—")), forcar_neg=True)
+        _metrica(
+            "Moved (USD)",
+            _neg_valor(d.get("total_movimentado_usd", "—")),
+            forcar_neg=True,
+            sub="last 90 days",
+            tooltip="Total USD volume moved (sent + received) across all transactions in the last 90 days.",
+        )
 
     # ─────────────────────────────────────
     # SECTION 4 — Composition
@@ -380,7 +462,6 @@ def _renderizar_dashboard(d: dict, carteira: str):
 
         pct_st     = _pct_float(comp.get("stablecoins_pct",  "0"))
         pct_cr     = _pct_float(comp.get("criptomoedas_pct", "0"))
-        # _comp_pct_fmt: sem sinal, sem duplo %, 2dp
         pct_st_fmt = _comp_pct_fmt(comp.get("stablecoins_pct",  "0"))
         pct_cr_fmt = _comp_pct_fmt(comp.get("criptomoedas_pct", "0"))
         val_st_fmt = _fmt2(comp.get("stablecoins",  "—"))
@@ -430,7 +511,6 @@ def _renderizar_dashboard(d: dict, carteira: str):
         df = pd.DataFrame(rows)
 
         def _estilo_col(val):
-            # Verifica sinal via string antes de parsear
             s = str(val)
             has_minus = "-" in s
             v = _parse_float(s)
