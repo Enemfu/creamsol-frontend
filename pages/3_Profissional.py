@@ -15,7 +15,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── CSS ────
+from components.estilo import aplicar_css
+aplicar_css()
+
+# ── CSS local ────
 st.markdown("""
 <style>
 .stApp { background-color: #F5F5F5; }
@@ -53,10 +56,6 @@ st.markdown("""
 .cs-var-valor.pos { color: #2E7D32; }
 .cs-var-valor.neg { color: #C62828; }
 
-.cs-risco-baixo  { color: #2E7D32; font-weight: 700; }
-.cs-risco-medio  { color: #F57C00; font-weight: 700; }
-.cs-risco-alto   { color: #C62828; font-weight: 700; }
-
 .cs-section-title {
     font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.1em; color: #9E9E9E; margin: 1.4rem 0 0.6rem 0;
@@ -79,17 +78,19 @@ section[data-testid="stSidebar"] {
 
 SOLANA_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 
+
 # ── Sidebar ────
 with st.sidebar:
     st.markdown('<div class="cs-logo">Cream<span>Sol</span>.io</div>', unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("**Navegação**")
-    st.page_link("app.py",                   label="🏠  Início")
-    st.page_link("pages/1_Beginner.py",      label="🟢  Beginner")
+    st.page_link("app.py",                    label="🏠  Início")
+    st.page_link("pages/1_Beginner.py",       label="🟢  Beginner")
     st.page_link("pages/2_Intermediario.py",  label="🔵  Intermediário")
     st.page_link("pages/3_Profissional.py",   label="⚫  Profissional")
     st.markdown("---")
     st.caption("v1.0.0 · creamsol.io")
+
 
 # ── Header ────
 st.markdown(
@@ -101,9 +102,10 @@ st.caption("Relatório completo · Score de risco · NFTs · Histórico · Expor
 st.markdown("---")
 
 
-# ════════════════════════════════════════════
-# AUTENTICAÇÃO
-# ════════════════════════════════════════════
+# ════════════════════════════════════════════════
+# AUTENTICAÇÃO (client-side + backend Bearer)
+# ════════════════════════════════════════════════
+
 if "auth_profissional" not in st.session_state:
     st.session_state["auth_profissional"] = False
 
@@ -120,12 +122,12 @@ if not st.session_state["auth_profissional"]:
     </div>
     """, unsafe_allow_html=True)
 
-    col_c, col_f, col_d = st.columns([1, 2, 1])
+    col_l, col_f, col_r = st.columns([1, 2, 1])
     with col_f:
         with st.form("form_token"):
             token_input = st.text_input(
                 "Token", type="password",
-                placeholder="••••••••••••••••",
+                placeholder="••••",
                 label_visibility="collapsed",
             )
             btn_token = st.form_submit_button("Autenticar", use_container_width=True)
@@ -139,9 +141,9 @@ if not st.session_state["auth_profissional"]:
     st.stop()
 
 
-# ════════════════════════════════════════════
+# ════════════════════════════════════════════════
 # ÁREA AUTENTICADA
-# ════════════════════════════════════════════
+# ════════════════════════════════════════════════
 
 with st.form("form_carteira_pro"):
     col_w, col_m, col_btn = st.columns([4, 1, 1])
@@ -152,7 +154,7 @@ with st.form("form_carteira_pro"):
             label_visibility="collapsed",
         )
     with col_m:
-        moeda = st.selectbox("Moeda", ["USD", "EUR"], label_visibility="collapsed")
+        moeda = st.selectbox("Moeda", ["USD", "EUR", "GBP"], label_visibility="collapsed")
     with col_btn:
         submitted = st.form_submit_button("🔍 Analisar", use_container_width=True)
 
@@ -170,8 +172,8 @@ def _cor(valor_str: str) -> str:
     try:
         v = float(
             str(valor_str)
-            .replace("$","").replace("€","").replace("%","")
-            .replace(",","").replace("<","").strip()
+            .replace("$", "").replace("€", "").replace("£", "").replace("%", "")
+            .replace(",", "").replace("+", "").replace("<", "").strip()
         )
         return "pos" if v > 0 else ("neg" if v < 0 else "")
     except Exception:
@@ -193,43 +195,55 @@ def _variacao_card(label: str, patrimonio: str, variacao: str):
     <div class="cs-var-card">
         <div class="cs-var-label">{label}</div>
         <div class="cs-var-valor">{patrimonio}</div>
-        <div class="cs-var-valor {cor}" style="font-size:1rem">{variacao}</div>
+        <div class="cs-var-valor {cor}" style="font-size:1rem; margin-top:0.2rem">{variacao}</div>
     </div>""", unsafe_allow_html=True)
 
 
 def _estilo_pnl(val):
     s = str(val)
-    if s in ("N/D", ""):
+    if s in ("N/D", "—", ""):
         return "color: #BDBDBD"
     try:
-        v = float(s.replace("$","").replace("€","").replace("%","")
-                   .replace(",","").replace("<","").strip())
-        if v > 0: return "color: #2E7D32; font-weight:700"
-        if v < 0: return "color: #C62828; font-weight:700"
+        v = float(
+            s.replace("$", "").replace("€", "").replace("£", "").replace("%", "")
+             .replace(",", "").replace("+", "").replace("<", "").strip()
+        )
+        if v > 0:
+            return "color: #2E7D32; font-weight:700"
+        if v < 0:
+            return "color: #C62828; font-weight:700"
     except Exception:
         pass
     return ""
 
 
-def _nivel_cor(nivel: str) -> str:
-    return {"baixo": "cs-risco-baixo", "medio": "cs-risco-medio", "alto": "cs-risco-alto"}.get(
-        nivel.lower(), ""
-    )
+def _estilo_nivel(val):
+    mapa = {
+        "Alto":  "color: #C62828; font-weight:700",
+        "Médio": "color: #F57C00; font-weight:700",
+        "Medio": "color: #F57C00; font-weight:700",
+        "Baixo": "color: #2E7D32; font-weight:700",
+    }
+    return mapa.get(str(val), "")
 
 
 def _get(endpoint: str, carteira: str, moeda: str, params: dict = None) -> dict | None:
+    """Faz GET autenticado ao backend com Bearer token."""
     try:
-        url = f"{API_BASE_URL}/v1/profissional/{endpoint}/{carteira}"
-        p = {"moeda": moeda}
+        url     = f"{API_BASE_URL}/v1/profissional/{endpoint}/{carteira}"
+        p       = {"moeda": moeda}
         if params:
             p.update(params)
-        resp = requests.get(url, params=p, timeout=60)
+        headers = {"Authorization": f"Bearer {TOKEN_PROFISSIONAL}"}
+        resp    = requests.get(url, headers=headers, params=p, timeout=60)
         resp.raise_for_status()
         return resp.json()
     except requests.exceptions.HTTPError as e:
         detalhe = ""
-        try: detalhe = e.response.json().get("detail", e.response.text)
-        except Exception: detalhe = e.response.text
+        try:
+            detalhe = e.response.json().get("detail", e.response.text)
+        except Exception:
+            detalhe = e.response.text
         st.error(f"Erro API ({e.response.status_code}): {detalhe}")
     except requests.exceptions.Timeout:
         st.error("Timeout — a blockchain demorou demasiado. Tente novamente.")
@@ -266,75 +280,86 @@ if submitted:
         "💾 Exportar",
     ])
 
-    # ══ Tab 1 — Relatório ══════════════════
+    # ══ Tab 1 — Relatório ════
     with tab1:
         st.markdown('<div class="cs-section-title">Patrimônio</div>', unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4, gap="small")
-        with c1: _metrica("Patrimônio Total",      relatorio["patrimonio_total"])
-        with c2: _metrica("Saldo SOL",             relatorio["saldo_sol_usd"])
-        with c3: _metrica("P&L Total",             relatorio["pnl_total"])
-        with c4: _metrica("ROI Médio",             relatorio["roi_medio"])
+        with c1: _metrica("Patrimônio Total",   relatorio.get("patrimonio_total", "N/D"))
+        with c2: _metrica("Saldo SOL",          relatorio.get("saldo_sol_usd",    "N/D"))
+        with c3: _metrica("P&L Não Realizado",  relatorio.get("pnl_total",        "N/D"))
+        with c4: _metrica("ROI Médio",          relatorio.get("roi_medio",        "N/D"))
 
         st.markdown('<div class="cs-section-title">Variação Histórica</div>', unsafe_allow_html=True)
         v1, v2, v3 = st.columns(3, gap="small")
-        with v1: _variacao_card("Actual",         relatorio["patrimonio_total"],     "—")
-        with v2: _variacao_card("7 dias atrás",   relatorio["patrimonio_7d_atras"],  relatorio["variacao_7d"])
-        with v3: _variacao_card("30 dias atrás",  relatorio["patrimonio_30d_atras"], relatorio["variacao_30d"])
+        with v1: _variacao_card("Actual",
+                                relatorio.get("patrimonio_total", "N/D"), "—")
+        with v2: _variacao_card("7 dias atrás",
+                                relatorio.get("patrimonio_7d_atras",  "N/D"),
+                                relatorio.get("variacao_7d",          "N/D"))
+        with v3: _variacao_card("30 dias atrás",
+                                relatorio.get("patrimonio_30d_atras", "N/D"),
+                                relatorio.get("variacao_30d",         "N/D"))
 
         st.markdown('<div class="cs-section-title">Custos e Taxas</div>', unsafe_allow_html=True)
         f1, f2, f3, f4 = st.columns(4, gap="small")
-        with f1: _metrica("Custo Total Investido", relatorio["custo_total_investido"])
-        with f2: _metrica("Taxas Pagas (USD)",     relatorio["total_taxas_usd"])
-        with f3: _metrica("Taxas Pagas (SOL)",     f"{relatorio['total_taxas_sol']:.6f}")
-        with f4: _metrica("Slippage Estimado",     relatorio["total_slippage_usd"])
+        with f1: _metrica("Custo Total Investido", relatorio.get("custo_total_investido", "N/D"))
+        with f2: _metrica("Taxas Pagas (USD)",     relatorio.get("total_taxas_usd",       "N/D"))
+        with f3: _metrica("Taxas Pagas (SOL)",     str(relatorio.get("total_taxas_sol",   "N/D")))
+        with f4: _metrica("Slippage Estimado",     relatorio.get("total_slippage_usd",    "—"))
 
         st.markdown('<div class="cs-section-title">Composição</div>', unsafe_allow_html=True)
-        comp = relatorio["composicao"]
+        comp = relatorio.get("composicao", {})
         cp1, cp2 = st.columns(2, gap="small")
-        with cp1: _metrica(f"Stablecoins ({comp['stablecoins_pct']})", comp["stablecoins"])
-        with cp2: _metrica(f"Criptomoedas ({comp['criptomoedas_pct']})", comp["criptomoedas"])
+        with cp1: _metrica(f"Stablecoins ({comp.get('stablecoins_pct', '')})", comp.get("stablecoins", "N/D"))
+        with cp2: _metrica(f"Criptomoedas ({comp.get('criptomoedas_pct', '')})", comp.get("criptomoedas", "N/D"))
 
         st.markdown('<div class="cs-section-title">NFTs</div>', unsafe_allow_html=True)
         n1, n2 = st.columns(2, gap="small")
-        with n1: _metrica("NFTs em carteira",    str(relatorio["n_nfts"]))
-        with n2: _metrica("Valor Estimado NFTs", relatorio["valor_nfts_estimado"])
+        with n1: _metrica("NFTs em carteira",    str(relatorio.get("n_nfts", 0)))
+        with n2: _metrica("Valor Estimado NFTs", relatorio.get("valor_nfts_estimado", "$0.00"))
 
         if nfts and nfts.get("nfts"):
-            with st.expander(f"🖼️ Ver NFTs ({nfts['n_nfts']})"):
-                rows_nft = []
-                for nft in nfts["nfts"]:
-                    rows_nft.append({
-                        "Nome":        nft["nome"],
-                        "Colecção":    nft["collection"],
-                        "Floor (USD)": nft["floor_usd"],
-                        "ID":          nft["id"][:20] + "…",
-                    })
+            with st.expander(f"🖼️ Ver NFTs ({nfts.get('n_nfts', 0)})"):
+                rows_nft = [
+                    {
+                        "Nome":        nft.get("nome",       "—"),
+                        "Colecção":    nft.get("collection", "—"),
+                        "Floor (USD)": nft.get("floor_usd",  "—"),
+                        "ID":          (nft.get("id", "")[:20] + "…") if nft.get("id") else "—",
+                    }
+                    for nft in nfts["nfts"]
+                ]
                 st.dataframe(pd.DataFrame(rows_nft), use_container_width=True, hide_index=True)
+
+        aviso = relatorio.get("aviso")
+        if aviso:
+            st.markdown(f'<div class="cs-aviso">⚠️ {aviso}</div>', unsafe_allow_html=True)
 
         st.markdown(f"""
         <div class="cs-aviso">
-            🕒 Timestamp: <strong>{relatorio.get("timestamp","—")}</strong> &nbsp;·&nbsp;
+            🕒 Timestamp: <strong>{relatorio.get("timestamp", "—")}</strong> &nbsp;·&nbsp;
             Carteira: <code style="font-size:0.75rem">{carteira}</code>
         </div>""", unsafe_allow_html=True)
 
-    # ══ Tab 2 — Tokens ══════════════════
+    # ══ Tab 2 — Tokens ════
     with tab2:
         tokens = relatorio.get("tokens", [])
         if tokens:
             st.markdown('<div class="cs-section-title">Performance por Token</div>', unsafe_allow_html=True)
-            rows = []
-            for t in tokens:
-                rows.append({
-                    "Símbolo":    t["simbolo"],
-                    "Verif.":     "✅" if t["verificado"] else "⚠️",
-                    "Quantidade": t["quantidade_atual"],
-                    "Preço":      t["preco_atual"],
-                    "Valor":      t["valor_atual"],
-                    "Custo Total":t["custo_total"],
-                    "Custo Médio":t["custo_medio"],
-                    "P&L":        t["pnl"],
-                    "ROI":        t["roi"],
-                })
+            rows = [
+                {
+                    "Símbolo":    t.get("simbolo",         "—"),
+                    "Verif.":     "✅" if t.get("verificado") else "⚠️",
+                    "Quantidade": t.get("quantidade_atual", "—"),
+                    "Preço":      t.get("preco_atual",      "—"),
+                    "Valor":      t.get("valor_atual",      "—"),
+                    "Custo Total":t.get("custo_total",      "N/D"),
+                    "Custo Médio":t.get("custo_medio",      "N/D"),
+                    "P&L":        t.get("pnl",              "N/D"),
+                    "ROI":        t.get("roi",              "N/D"),
+                }
+                for t in tokens
+            ]
             df = pd.DataFrame(rows)
             styled = (
                 df.style
@@ -345,78 +370,77 @@ if submitted:
         else:
             st.info("Nenhum token encontrado.")
 
-    # ══ Tab 3 — Risco ══════════════════
+    # ══ Tab 3 — Risco ════
     with tab3:
-        dados_risco = risco or relatorio  # fallback para indicadores no próprio relatório
-        score = dados_risco.get("score_risco", "N/D")
-        indicadores = dados_risco.get("indicadores_risco", [])
+        if risco:
+            score       = risco.get("score_risco", "N/D")
+            indicadores = risco.get("indicadores_risco", [])
 
-        st.markdown('<div class="cs-section-title">Score de Risco Global</div>', unsafe_allow_html=True)
-        nivel_map = {"Baixo": "cs-risco-baixo", "Médio": "cs-risco-medio", "Alto": "cs-risco-alto"}
-        cls_score = nivel_map.get(score, "")
-        st.markdown(f'<p style="font-size:2rem; font-weight:900" class="{cls_score}">{score}</p>',
-                    unsafe_allow_html=True)
+            st.markdown('<div class="cs-section-title">Score de Risco Global</div>', unsafe_allow_html=True)
+            cor_score = {"Baixo": "#2E7D32", "Médio": "#F57C00", "Alto": "#C62828"}.get(score, "#1A1A1A")
+            st.markdown(
+                f'<p style="font-size:2rem; font-weight:900; color:{cor_score}">{score}</p>',
+                unsafe_allow_html=True,
+            )
 
-        if indicadores:
-            st.markdown('<div class="cs-section-title">Indicadores</div>', unsafe_allow_html=True)
-            rows_risco = []
-            for ind in indicadores:
-                rows_risco.append({
-                    "Indicador":  ind["nome"],
-                    "Valor":      ind["valor"],
-                    "Nível":      ind["nivel"].capitalize(),
-                    "Descrição":  ind["descricao"],
-                })
-
-            def _cor_nivel(val):
-                if val == "Alto":    return "color: #C62828; font-weight:700"
-                if val == "Medio":   return "color: #F57C00; font-weight:700"
-                if val == "Baixo":   return "color: #2E7D32; font-weight:700"
-                return ""
-
-            df_risco = pd.DataFrame(rows_risco)
-            styled_r = df_risco.style.map(_cor_nivel, subset=["Nível"])
-            st.dataframe(styled_r, use_container_width=True, hide_index=True)
+            if indicadores:
+                st.markdown('<div class="cs-section-title">Indicadores</div>', unsafe_allow_html=True)
+                rows_risco = [
+                    {
+                        "Indicador":  ind.get("nome",      "—"),
+                        "Valor":      ind.get("valor",     "—"),
+                        "Nível":      ind.get("nivel",     "—").capitalize(),
+                        "Descrição":  ind.get("descricao", "—"),
+                    }
+                    for ind in indicadores
+                ]
+                df_risco = pd.DataFrame(rows_risco)
+                styled_r = df_risco.style.map(_estilo_nivel, subset=["Nível"])
+                st.dataframe(styled_r, use_container_width=True, hide_index=True)
 
         st.markdown("""
         <div class="cs-aviso">
             ⚠️ A análise de risco é indicativa e não substitui assessoria financeira.
-            Tokens não verificados podem ser scams ou ativos sem liquidez.
+            Tokens não verificados podem ser scams ou activos sem liquidez.
         </div>""", unsafe_allow_html=True)
 
-    # ══ Tab 4 — Histórico ══════════════════
+    # ══ Tab 4 — Histórico ════
     with tab4:
         if historico and historico.get("eventos"):
             st.markdown('<div class="cs-section-title">Resumo</div>', unsafe_allow_html=True)
             h1, h2, h3 = st.columns(3, gap="small")
-            with h1: _metrica("Eventos",            str(historico["n_eventos"]))
-            with h2: _metrica("Total Movimentado",  historico["total_movimentado_usd"])
-            with h3: _metrica("Taxas Pagas",        historico["total_taxas_usd"])
+            with h1: _metrica("Eventos",           str(historico.get("n_eventos", 0)))
+            with h2: _metrica("Total Movimentado", historico.get("total_movimentado_usd", "—"))
+            with h3: _metrica("Taxas Pagas",       historico.get("total_taxas_usd", "—"))
 
             st.markdown('<div class="cs-section-title">Transacções</div>', unsafe_allow_html=True)
-            rows_hist = []
-            for ev in historico["eventos"]:
-                rows_hist.append({
-                    "Data":       ev["timestamp"],
-                    "Tipo":       ev["tipo"],
-                    "Descrição":  ev["descricao"],
-                    "Valor":      ev["valor_usd"],
-                    "Assinatura": ev["signature"],
-                })
+            rows_hist = [
+                {
+                    "Data":       ev.get("timestamp", "—"),
+                    "Tipo":       ev.get("tipo",       "—"),
+                    "Descrição":  ev.get("descricao",  "—"),
+                    "Valor":      ev.get("valor_usd",  "—"),
+                    "Assinatura": ev.get("signature",  "—"),
+                }
+                for ev in historico["eventos"]
+            ]
             st.dataframe(pd.DataFrame(rows_hist), use_container_width=True, hide_index=True)
         else:
             st.info("Sem histórico de transacções disponível.")
 
-    # ══ Tab 5 — Exportar ══════════════════
+    # ══ Tab 5 — Exportar ════
     with tab5:
         st.markdown('<div class="cs-section-title">Exportar Relatório</div>', unsafe_allow_html=True)
         col_j, col_c, _ = st.columns([1, 1, 2], gap="small")
+
+        headers_export = {"Authorization": f"Bearer {TOKEN_PROFISSIONAL}"}
 
         with col_j:
             if st.button("⬇️ Download JSON", use_container_width=True):
                 try:
                     url = f"{API_BASE_URL}/v1/profissional/export/{carteira}"
-                    r = requests.get(url, params={"formato": "json", "moeda": moeda}, timeout=60)
+                    r   = requests.get(url, headers=headers_export,
+                                       params={"formato": "json", "moeda": moeda}, timeout=60)
                     r.raise_for_status()
                     st.download_button(
                         label="💾 Guardar JSON",
@@ -432,7 +456,8 @@ if submitted:
             if st.button("⬇️ Download CSV", use_container_width=True):
                 try:
                     url = f"{API_BASE_URL}/v1/profissional/export/{carteira}"
-                    r = requests.get(url, params={"formato": "csv", "moeda": moeda}, timeout=60)
+                    r   = requests.get(url, headers=headers_export,
+                                       params={"formato": "csv", "moeda": moeda}, timeout=60)
                     r.raise_for_status()
                     st.download_button(
                         label="💾 Guardar CSV",
