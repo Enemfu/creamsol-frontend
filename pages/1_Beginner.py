@@ -18,7 +18,7 @@ st.set_page_config(
 st.markdown("""
 <style>
 .stApp { background-color: #F5F5F5; }
-.block-container { padding-top: 1.8rem; padding-bottom: 2rem; max-width: 1100px; }
+.block-container { padding-top: 3rem; padding-bottom: 2rem; max-width: 1100px; }
 
 .cs-logo { font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; color: #1A1A1A; }
 .cs-logo span { color: #2E7D32; }
