@@ -104,7 +104,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Navigation**")
     st.page_link("app.py",                   label="🏠  Home",           icon=None)
-    st.page_link("pages/1_Iniciante.py",      label="🟢  Beginner",       icon=None)
+    st.page_link("pages/1_Beginner.py",      label="🟢  Beginner",       icon=None)
     st.page_link("pages/2_Intermediario.py",  label="🔵  Intermediate",   icon=None)
     st.page_link("pages/3_Profissional.py",   label="⚫  Professional",   icon=None)
     st.markdown("---")
@@ -139,7 +139,7 @@ with col1:
     </div>
     """, unsafe_allow_html=True)
     st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
-    st.page_link("pages/1_Iniciante.py", label="🟢  Go to Beginner", use_container_width=True)
+    st.page_link("pages/1_Beginner.py", label="🟢  Go to Beginner", use_container_width=True)
 
 with col2:
     st.markdown("""
