@@ -10,7 +10,7 @@ from config import API_BASE_URL, TOKEN_PROFISSIONAL
 
 st.set_page_config(
     page_title="Profissional · CreamSol.io",
-    page_icon="⚫",
+    page_icon="assets/favicon.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -18,14 +18,15 @@ st.set_page_config(
 from components.estilo import aplicar_css
 aplicar_css()
 
-# ── CSS local ────
+# ── CSS ────
 st.markdown("""
 <style>
 .stApp { background-color: #F5F5F5; }
 .block-container { padding-top: 1.8rem; padding-bottom: 2rem; max-width: 1100px; }
 
+/* Logo — SOL em preto/neutro (cor do plano Profissional) */
 .cs-logo { font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; color: #1A1A1A; }
-.cs-logo span { color: #C62828; }
+.cs-logo span { color: #1A1A1A; }
 
 .cs-badge {
     display: inline-block; font-size: 0.7rem; font-weight: 700;
@@ -56,6 +57,10 @@ st.markdown("""
 .cs-var-valor.pos { color: #2E7D32; }
 .cs-var-valor.neg { color: #C62828; }
 
+.cs-risco-baixo  { color: #2E7D32; font-weight: 700; }
+.cs-risco-medio  { color: #F57C00; font-weight: 700; }
+.cs-risco-alto   { color: #C62828; font-weight: 700; }
+
 .cs-section-title {
     font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.1em; color: #9E9E9E; margin: 1.4rem 0 0.6rem 0;
@@ -78,19 +83,17 @@ section[data-testid="stSidebar"] {
 
 SOLANA_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 
-
 # ── Sidebar ────
 with st.sidebar:
     st.markdown('<div class="cs-logo">Cream<span>Sol</span>.io</div>', unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("**Navegação**")
-    st.page_link("app.py",                    label="🏠  Início")
-    st.page_link("pages/1_Beginner.py",       label="🟢  Beginner")
-    st.page_link("pages/2_Intermediario.py",  label="🔵  Intermediário")
-    st.page_link("pages/3_Profissional.py",   label="⚫  Profissional")
+    st.page_link("app.py",                   label="🏠  Início")
+    st.page_link("pages/1_Beginner.py",      label="🟢  Beginner")
+    st.page_link("pages/2_Intermediario.py", label="🔵  Intermediário")
+    st.page_link("pages/3_Profissional.py",  label="⚫  Profissional")
     st.markdown("---")
     st.caption("v1.0.0 · creamsol.io")
-
 
 # ── Header ────
 st.markdown(
@@ -103,7 +106,7 @@ st.markdown("---")
 
 
 # ════════════════════════════════════════════════
-# AUTENTICAÇÃO (client-side + backend Bearer)
+# AUTENTICAÇÃO
 # ════════════════════════════════════════════════
 
 if "auth_profissional" not in st.session_state:
@@ -122,7 +125,7 @@ if not st.session_state["auth_profissional"]:
     </div>
     """, unsafe_allow_html=True)
 
-    col_l, col_f, col_r = st.columns([1, 2, 1])
+    col_c, col_f, col_d = st.columns([1, 2, 1])
     with col_f:
         with st.form("form_token"):
             token_input = st.text_input(
@@ -166,22 +169,28 @@ with col_sair:
 
 
 # ── Helpers ────
+
 def _cor(valor_str: str) -> str:
-    if not valor_str or str(valor_str).strip() in ("N/D", "", "—"):
+    s = str(valor_str).strip()
+    if s in ("N/D", "", "—"):
         return "nd"
     try:
         v = float(
-            str(valor_str)
-            .replace("$", "").replace("€", "").replace("£", "").replace("%", "")
-            .replace(",", "").replace("+", "").replace("<", "").strip()
+            s.replace("$","").replace("€","").replace("£","")
+             .replace("%","").replace(",","").replace("<","").strip()
         )
         return "pos" if v > 0 else ("neg" if v < 0 else "")
     except Exception:
         return "nd"
 
 
-def _metrica(label: str, valor: str):
-    cor = _cor(valor)
+def _metrica(label: str, valor: str, forcar_neg: bool = False, neutral: bool = False):
+    if neutral:
+        cor = ""
+    elif forcar_neg:
+        cor = "neg"
+    else:
+        cor = _cor(valor)
     st.markdown(f"""
     <div class="cs-metric">
         <div class="cs-metric-label">{label}</div>
@@ -195,7 +204,7 @@ def _variacao_card(label: str, patrimonio: str, variacao: str):
     <div class="cs-var-card">
         <div class="cs-var-label">{label}</div>
         <div class="cs-var-valor">{patrimonio}</div>
-        <div class="cs-var-valor {cor}" style="font-size:1rem; margin-top:0.2rem">{variacao}</div>
+        <div class="cs-var-valor {cor}" style="font-size:1rem">{variacao}</div>
     </div>""", unsafe_allow_html=True)
 
 
@@ -205,30 +214,17 @@ def _estilo_pnl(val):
         return "color: #BDBDBD"
     try:
         v = float(
-            s.replace("$", "").replace("€", "").replace("£", "").replace("%", "")
-             .replace(",", "").replace("+", "").replace("<", "").strip()
+            s.replace("$","").replace("€","").replace("£","")
+             .replace("%","").replace(",","").replace("<","").strip()
         )
-        if v > 0:
-            return "color: #2E7D32; font-weight:700"
-        if v < 0:
-            return "color: #C62828; font-weight:700"
+        if v > 0: return "color: #2E7D32; font-weight:700"
+        if v < 0: return "color: #C62828; font-weight:700"
     except Exception:
         pass
     return ""
 
 
-def _estilo_nivel(val):
-    mapa = {
-        "Alto":  "color: #C62828; font-weight:700",
-        "Médio": "color: #F57C00; font-weight:700",
-        "Medio": "color: #F57C00; font-weight:700",
-        "Baixo": "color: #2E7D32; font-weight:700",
-    }
-    return mapa.get(str(val), "")
-
-
 def _get(endpoint: str, carteira: str, moeda: str, params: dict = None) -> dict | None:
-    """Faz GET autenticado ao backend com Bearer token."""
     try:
         url     = f"{API_BASE_URL}/v1/profissional/{endpoint}/{carteira}"
         p       = {"moeda": moeda}
@@ -239,7 +235,6 @@ def _get(endpoint: str, carteira: str, moeda: str, params: dict = None) -> dict 
         resp.raise_for_status()
         return resp.json()
     except requests.exceptions.HTTPError as e:
-        detalhe = ""
         try:
             detalhe = e.response.json().get("detail", e.response.text)
         except Exception:
@@ -284,39 +279,47 @@ if submitted:
     with tab1:
         st.markdown('<div class="cs-section-title">Patrimônio</div>', unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4, gap="small")
-        with c1: _metrica("Patrimônio Total",   relatorio.get("patrimonio_total", "N/D"))
-        with c2: _metrica("Saldo SOL",          relatorio.get("saldo_sol_usd",    "N/D"))
-        with c3: _metrica("P&L Não Realizado",  relatorio.get("pnl_total",        "N/D"))
-        with c4: _metrica("ROI Médio",          relatorio.get("roi_medio",        "N/D"))
+        with c1: _metrica("Patrimônio Total", relatorio.get("patrimonio_total", "N/D"))
+        with c2: _metrica("Saldo SOL",        relatorio.get("saldo_sol_usd",    "N/D"), neutral=True)
+        with c3: _metrica("P&L Total",        relatorio.get("pnl_total",        "N/D"))
+        with c4: _metrica("ROI Médio",        relatorio.get("roi_medio",        "N/D"))
 
         st.markdown('<div class="cs-section-title">Variação Histórica</div>', unsafe_allow_html=True)
         v1, v2, v3 = st.columns(3, gap="small")
         with v1: _variacao_card("Actual",
-                                relatorio.get("patrimonio_total", "N/D"), "—")
+                                relatorio.get("patrimonio_total",    "N/D"), "—")
         with v2: _variacao_card("7 dias atrás",
-                                relatorio.get("patrimonio_7d_atras",  "N/D"),
-                                relatorio.get("variacao_7d",          "N/D"))
+                                relatorio.get("patrimonio_7d_atras", "N/D"),
+                                relatorio.get("variacao_7d",         "N/D"))
         with v3: _variacao_card("30 dias atrás",
-                                relatorio.get("patrimonio_30d_atras", "N/D"),
-                                relatorio.get("variacao_30d",         "N/D"))
+                                relatorio.get("patrimonio_30d_atras","N/D"),
+                                relatorio.get("variacao_30d",        "N/D"))
 
         st.markdown('<div class="cs-section-title">Custos e Taxas</div>', unsafe_allow_html=True)
         f1, f2, f3, f4 = st.columns(4, gap="small")
-        with f1: _metrica("Custo Total Investido", relatorio.get("custo_total_investido", "N/D"))
-        with f2: _metrica("Taxas Pagas (USD)",     relatorio.get("total_taxas_usd",       "N/D"))
-        with f3: _metrica("Taxas Pagas (SOL)",     str(relatorio.get("total_taxas_sol",   "N/D")))
-        with f4: _metrica("Slippage Estimado",     relatorio.get("total_slippage_usd",    "—"))
+        with f1: _metrica("Custo Total Investido", relatorio.get("custo_total_investido", "N/D"), neutral=True)
+        with f2: _metrica("Taxas Pagas (USD)",     relatorio.get("total_taxas_usd",       "N/D"), forcar_neg=True)
+        with f3: _metrica("Taxas Pagas (SOL)",
+                           f"{relatorio.get('total_taxas_sol', 0):.6f} SOL",
+                           forcar_neg=True)
+        with f4:
+            slip = relatorio.get("total_slippage_usd", "—")
+            _metrica("Slippage Estimado", slip if slip != "—" else "N/D",
+                     forcar_neg=(slip not in ("—", "N/D")))
 
         st.markdown('<div class="cs-section-title">Composição</div>', unsafe_allow_html=True)
         comp = relatorio.get("composicao", {})
-        cp1, cp2 = st.columns(2, gap="small")
-        with cp1: _metrica(f"Stablecoins ({comp.get('stablecoins_pct', '')})", comp.get("stablecoins", "N/D"))
-        with cp2: _metrica(f"Criptomoedas ({comp.get('criptomoedas_pct', '')})", comp.get("criptomoedas", "N/D"))
+        if comp:
+            cp1, cp2 = st.columns(2, gap="small")
+            with cp1: _metrica(f"Stablecoins ({comp.get('stablecoins_pct','—')})",
+                                comp.get("stablecoins", "N/D"), neutral=True)
+            with cp2: _metrica(f"Criptomoedas ({comp.get('criptomoedas_pct','—')})",
+                                comp.get("criptomoedas", "N/D"), neutral=True)
 
         st.markdown('<div class="cs-section-title">NFTs</div>', unsafe_allow_html=True)
         n1, n2 = st.columns(2, gap="small")
-        with n1: _metrica("NFTs em carteira",    str(relatorio.get("n_nfts", 0)))
-        with n2: _metrica("Valor Estimado NFTs", relatorio.get("valor_nfts_estimado", "$0.00"))
+        with n1: _metrica("NFTs em carteira",    str(relatorio.get("n_nfts", 0)), neutral=True)
+        with n2: _metrica("Valor Estimado NFTs", relatorio.get("valor_nfts_estimado", "N/D"), neutral=True)
 
         if nfts and nfts.get("nfts"):
             with st.expander(f"🖼️ Ver NFTs ({nfts.get('n_nfts', 0)})"):
@@ -325,19 +328,15 @@ if submitted:
                         "Nome":        nft.get("nome",       "—"),
                         "Colecção":    nft.get("collection", "—"),
                         "Floor (USD)": nft.get("floor_usd",  "—"),
-                        "ID":          (nft.get("id", "")[:20] + "…") if nft.get("id") else "—",
+                        "ID":          str(nft.get("id",""))[:20] + "…",
                     }
                     for nft in nfts["nfts"]
                 ]
                 st.dataframe(pd.DataFrame(rows_nft), use_container_width=True, hide_index=True)
 
-        aviso = relatorio.get("aviso")
-        if aviso:
-            st.markdown(f'<div class="cs-aviso">⚠️ {aviso}</div>', unsafe_allow_html=True)
-
         st.markdown(f"""
         <div class="cs-aviso">
-            🕒 Timestamp: <strong>{relatorio.get("timestamp", "—")}</strong> &nbsp;·&nbsp;
+            🕒 <strong>{relatorio.get("timestamp","—")}</strong> &nbsp;·&nbsp;
             Carteira: <code style="font-size:0.75rem">{carteira}</code>
         </div>""", unsafe_allow_html=True)
 
@@ -348,15 +347,15 @@ if submitted:
             st.markdown('<div class="cs-section-title">Performance por Token</div>', unsafe_allow_html=True)
             rows = [
                 {
-                    "Símbolo":    t.get("simbolo",         "—"),
-                    "Verif.":     "✅" if t.get("verificado") else "⚠️",
-                    "Quantidade": t.get("quantidade_atual", "—"),
-                    "Preço":      t.get("preco_atual",      "—"),
-                    "Valor":      t.get("valor_atual",      "—"),
-                    "Custo Total":t.get("custo_total",      "N/D"),
-                    "Custo Médio":t.get("custo_medio",      "N/D"),
-                    "P&L":        t.get("pnl",              "N/D"),
-                    "ROI":        t.get("roi",              "N/D"),
+                    "Símbolo":     t.get("simbolo",        "—"),
+                    "Verif.":      "✅" if t.get("verificado") else "⚠️",
+                    "Quantidade":  t.get("quantidade_atual","—"),
+                    "Preço":       t.get("preco_atual",     "—"),
+                    "Valor":       t.get("valor_atual",     "—"),
+                    "Custo Total": t.get("custo_total",     "N/D"),
+                    "Custo Médio": t.get("custo_medio",     "N/D"),
+                    "P&L":         t.get("pnl",             "N/D"),
+                    "ROI":         t.get("roi",             "N/D"),
                 }
                 for t in tokens
             ]
@@ -372,31 +371,39 @@ if submitted:
 
     # ══ Tab 3 — Risco ════
     with tab3:
-        if risco:
-            score       = risco.get("score_risco", "N/D")
-            indicadores = risco.get("indicadores_risco", [])
+        dados_risco  = risco or {}
+        score        = dados_risco.get("score_risco", "N/D")
+        indicadores  = dados_risco.get("indicadores_risco", [])
 
-            st.markdown('<div class="cs-section-title">Score de Risco Global</div>', unsafe_allow_html=True)
-            cor_score = {"Baixo": "#2E7D32", "Médio": "#F57C00", "Alto": "#C62828"}.get(score, "#1A1A1A")
-            st.markdown(
-                f'<p style="font-size:2rem; font-weight:900; color:{cor_score}">{score}</p>',
-                unsafe_allow_html=True,
-            )
+        st.markdown('<div class="cs-section-title">Score de Risco Global</div>', unsafe_allow_html=True)
+        nivel_map = {"Baixo": "cs-risco-baixo", "Médio": "cs-risco-medio", "Alto": "cs-risco-alto"}
+        cls_score = nivel_map.get(score, "")
+        st.markdown(
+            f'<p style="font-size:2rem; font-weight:900" class="{cls_score}">{score}</p>',
+            unsafe_allow_html=True,
+        )
 
-            if indicadores:
-                st.markdown('<div class="cs-section-title">Indicadores</div>', unsafe_allow_html=True)
-                rows_risco = [
-                    {
-                        "Indicador":  ind.get("nome",      "—"),
-                        "Valor":      ind.get("valor",     "—"),
-                        "Nível":      ind.get("nivel",     "—").capitalize(),
-                        "Descrição":  ind.get("descricao", "—"),
-                    }
-                    for ind in indicadores
-                ]
-                df_risco = pd.DataFrame(rows_risco)
-                styled_r = df_risco.style.map(_estilo_nivel, subset=["Nível"])
-                st.dataframe(styled_r, use_container_width=True, hide_index=True)
+        if indicadores:
+            st.markdown('<div class="cs-section-title">Indicadores</div>', unsafe_allow_html=True)
+
+            def _cor_nivel(val):
+                if val == "Alto":  return "color: #C62828; font-weight:700"
+                if val == "Medio": return "color: #F57C00; font-weight:700"
+                if val == "Baixo": return "color: #2E7D32; font-weight:700"
+                return ""
+
+            rows_risco = [
+                {
+                    "Indicador": ind.get("nome",     "—"),
+                    "Valor":     ind.get("valor",    "—"),
+                    "Nível":     ind.get("nivel",    "—").capitalize(),
+                    "Descrição": ind.get("descricao","—"),
+                }
+                for ind in indicadores
+            ]
+            df_risco = pd.DataFrame(rows_risco)
+            styled_r = df_risco.style.map(_cor_nivel, subset=["Nível"])
+            st.dataframe(styled_r, use_container_width=True, hide_index=True)
 
         st.markdown("""
         <div class="cs-aviso">
@@ -409,14 +416,14 @@ if submitted:
         if historico and historico.get("eventos"):
             st.markdown('<div class="cs-section-title">Resumo</div>', unsafe_allow_html=True)
             h1, h2, h3 = st.columns(3, gap="small")
-            with h1: _metrica("Eventos",           str(historico.get("n_eventos", 0)))
-            with h2: _metrica("Total Movimentado", historico.get("total_movimentado_usd", "—"))
-            with h3: _metrica("Taxas Pagas",       historico.get("total_taxas_usd", "—"))
+            with h1: _metrica("Eventos",           str(historico.get("n_eventos", 0)), neutral=True)
+            with h2: _metrica("Total Movimentado", historico.get("total_movimentado_usd", "N/D"), neutral=True)
+            with h3: _metrica("Taxas Pagas",       historico.get("total_taxas_usd", "N/D"), forcar_neg=True)
 
             st.markdown('<div class="cs-section-title">Transacções</div>', unsafe_allow_html=True)
             rows_hist = [
                 {
-                    "Data":       ev.get("timestamp", "—"),
+                    "Data":       ev.get("timestamp",  "—"),
                     "Tipo":       ev.get("tipo",       "—"),
                     "Descrição":  ev.get("descricao",  "—"),
                     "Valor":      ev.get("valor_usd",  "—"),
@@ -432,14 +439,13 @@ if submitted:
     with tab5:
         st.markdown('<div class="cs-section-title">Exportar Relatório</div>', unsafe_allow_html=True)
         col_j, col_c, _ = st.columns([1, 1, 2], gap="small")
-
-        headers_export = {"Authorization": f"Bearer {TOKEN_PROFISSIONAL}"}
+        _headers_export = {"Authorization": f"Bearer {TOKEN_PROFISSIONAL}"}
 
         with col_j:
             if st.button("⬇️ Download JSON", use_container_width=True):
                 try:
                     url = f"{API_BASE_URL}/v1/profissional/export/{carteira}"
-                    r   = requests.get(url, headers=headers_export,
+                    r   = requests.get(url, headers=_headers_export,
                                        params={"formato": "json", "moeda": moeda}, timeout=60)
                     r.raise_for_status()
                     st.download_button(
@@ -456,7 +462,7 @@ if submitted:
             if st.button("⬇️ Download CSV", use_container_width=True):
                 try:
                     url = f"{API_BASE_URL}/v1/profissional/export/{carteira}"
-                    r   = requests.get(url, headers=headers_export,
+                    r   = requests.get(url, headers=_headers_export,
                                        params={"formato": "csv", "moeda": moeda}, timeout=60)
                     r.raise_for_status()
                     st.download_button(
