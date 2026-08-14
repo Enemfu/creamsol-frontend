@@ -713,47 +713,59 @@ if submitted:
             st.info("No DeFi data available for this wallet.")
 
     # ══════════════════════════════════════
-    # Tab 5 — Export
-    # ══════════════════════════════════════
+    # ══ Tab 5 — Exportar ════
     with tab5:
-        st.markdown('<div class="cs-section-title">Export Data</div>', unsafe_allow_html=True)
+        st.markdown('<div class="cs-section-title">Exportar Dados</div>', unsafe_allow_html=True)
+
+        # Inicializar estado
+        for _k in ("int_export_json", "int_export_csv"):
+            if _k not in st.session_state:
+                st.session_state[_k] = None
 
         col_j, col_c, _ = st.columns([1, 1, 2], gap="small")
 
         with col_j:
-            if st.button("⬇️ Download JSON", use_container_width=True):
+            if st.button("⬇️ Gerar JSON", use_container_width=True, key="int_btn_json"):
                 try:
                     url = f"{API_BASE_URL}/v1/intermediario/export/{carteira}?formato=json&moeda={moeda}"
-                    r   = requests.get(url, timeout=45)
+                    r = requests.get(url, timeout=45)
                     r.raise_for_status()
-                    st.download_button(
-                        label="💾 Save JSON",
-                        data=r.text,
-                        file_name=f"creamsol_int_{carteira[:8]}.json",
-                        mime="application/json",
-                        use_container_width=True,
-                    )
+                    st.session_state["int_export_json"] = r.text
                 except Exception as e:
-                    st.error(f"Error generating JSON: {e}")
+                    st.error(f"Erro ao gerar JSON: {e}")
+
+            if st.session_state.get("int_export_json"):
+                st.download_button(
+                    label="💾 Guardar JSON",
+                    data=st.session_state["int_export_json"],
+                    file_name=f"creamsol_int_{carteira[:8]}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                    key="int_dl_json",
+                )
 
         with col_c:
-            if st.button("⬇️ Download CSV", use_container_width=True):
+            if st.button("⬇️ Gerar CSV", use_container_width=True, key="int_btn_csv"):
                 try:
                     url = f"{API_BASE_URL}/v1/intermediario/export/{carteira}?formato=csv&moeda={moeda}"
-                    r   = requests.get(url, timeout=45)
+                    r = requests.get(url, timeout=45)
                     r.raise_for_status()
-                    st.download_button(
-                        label="💾 Save CSV",
-                        data=r.content,
-                        file_name=f"creamsol_int_{carteira[:8]}.csv",
-                        mime="text/csv",
-                        use_container_width=True,
-                    )
+                    st.session_state["int_export_csv"] = r.content
                 except Exception as e:
-                    st.error(f"Error generating CSV: {e}")
+                    st.error(f"Erro ao gerar CSV: {e}")
+
+            if st.session_state.get("int_export_csv"):
+                st.download_button(
+                    label="💾 Guardar CSV",
+                    data=st.session_state["int_export_csv"],
+                    file_name=f"creamsol_int_{carteira[:8]}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key="int_dl_csv",
+                )
 
         st.markdown("""
         <div class="cs-aviso">
-            🔒 <strong>Privacy:</strong> Exported files contain no identifying data beyond the public
-            wallet address. No data is retained on the server after the response.
+            🔒 Os ficheiros exportados não contêm dados identificativos além do endereço público da carteira.
+            Nenhum dado é retido no servidor após a resposta.
         </div>""", unsafe_allow_html=True)
