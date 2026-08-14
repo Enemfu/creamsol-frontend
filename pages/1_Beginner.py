@@ -1,5 +1,5 @@
 # ====
-# pages/1_Iniciante.py — CreamSol.io · Beginner Plan
+# pages/1_Beginner.py — CreamSol.io · Beginner Plan
 # ====
 
 import streamlit as st
@@ -124,7 +124,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Navigation**")
     st.page_link("app.py",                  label="🏠  Home")
-    st.page_link("pages/1_Iniciante.py",     label="🟢  Beginner")
+    st.page_link("pages/1_Beginner.py",     label="🟢  Beginner")
     st.page_link("pages/2_Intermediario.py", label="🔵  Intermediate")
     st.page_link("pages/3_Profissional.py",  label="⚫  Professional")
     st.markdown("---")
@@ -281,7 +281,7 @@ def _neg_valor(valor_str: str) -> str:
 
 def _chamar_api(carteira: str, moeda: str) -> dict | None:
     try:
-        url  = f"{API_BASE_URL}/v1/iniciante/{carteira}?moeda={moeda}"
+        url  = f"{API_BASE_URL}/v1/Beginner/{carteira}?moeda={moeda}"
         resp = requests.get(url, timeout=45)
         resp.raise_for_status()
         return resp.json()
