@@ -281,7 +281,7 @@ def _neg_valor(valor_str: str) -> str:
 
 def _chamar_api(carteira: str, moeda: str) -> dict | None:
     try:
-        url  = f"{API_BASE_URL}/v1/Beginner/{carteira}?moeda={moeda}"
+        url  = f"{API_BASE_URL}/v1/iniciante/{carteira}?moeda={moeda}"
         resp = requests.get(url, timeout=45)
         resp.raise_for_status()
         return resp.json()
