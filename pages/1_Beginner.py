@@ -1,5 +1,5 @@
 # ====
-# pages/1_Iniciante.py — CreamSol.io · Plano Iniciante (Gratuito)
+# pages/1_Beginner.py — CreamSol.io · Plano Iniciante (Gratuito)
 # ====
 
 import streamlit as st
@@ -87,7 +87,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Navegação**")
     st.page_link("app.py",                   label="🏠  Início")
-    st.page_link("pages/1_Iniciante.py",      label="🟢  Iniciante")
+    st.page_link("pages/1_Beginner.py",      label="🟢  Iniciante")
     st.page_link("pages/2_Intermediario.py",  label="🔵  Intermediário")
     st.page_link("pages/3_Profissional.py",   label="⚫  Profissional")
     st.markdown("---")
